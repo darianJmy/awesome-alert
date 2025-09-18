@@ -1,0 +1,54 @@
+### 定义变量
+@host = 127.0.0.1:8777
+@baseUrl = http://{{host}}/v1/datasource
+
+### 创建数据源
+POST {{baseUrl}}/create
+Content-Type: application/json
+
+{
+  "name": "prometheus",
+  "type": "prometheus",
+  "description": "test prometheus",
+  "prometheus_config": {
+    "url": "http://127.0.0.1:9090",
+    "authentication": {
+      "name": "abc",
+      "password": "123456"
+    },
+    "skip_tls": true
+  }
+}
+
+### 更新数据源
+PUT {{baseUrl}}/update
+Content-Type: application/json
+
+{
+  "name": "prometheus",
+  "type": "prometheus",
+  "description": "test prometheus",
+  "prometheus_config": {
+    "url": "http://127.0.0.1:9090",
+    "authentication": {
+      "name": "abc",
+      "password": "1234567"
+    },
+    "skip_tls": true
+  }
+}
+
+
+
+### 删除数据源
+DELETE {{baseUrl}}/delete?name=prometheus
+Accept: application/json
+
+### 获取数据源
+GET {{baseUrl}}/get?name=prometheus
+Accept: application/json
+
+### 获取数据源列表
+GET {{baseUrl}}/list?page=1&page_size=10&name=abc
+Content-Type: application/json
+
