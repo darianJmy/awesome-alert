@@ -1,0 +1,467 @@
+package handlers
+
+import (
+	"aiops-backend/database"
+	"aiops-backend/models"
+	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+func ListTunnels(c *gin.Context) {
+	var tunnels []models.Tunnel
+	database.DB.Order("id ASC").Find(&tunnels)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": tunnels})
+}
+
+type CreateTunnelReq struct {
+	Name        string `json:"name" binding:"required"`
+	Type        string `json:"type" binding:"required"`
+	Host        string `json:"host" binding:"required"`
+	Port        int    `json:"port"`
+	Username    string `json:"username"`
+	AuthType    string `json:"auth_type"`
+	AuthConfig  string `json:"auth_config"`
+	Region      string `json:"region"`
+	Status      int    `json:"status"`
+	Description string `json:"description"`
+}
+
+func CreateTunnel(c *gin.Context) {
+	var req CreateTunnelReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
+		return
+	}
+	if req.Port == 0 {
+		req.Port = 22
+	}
+	if req.AuthType == "" {
+		req.AuthType = "password"
+	}
+	if req.Status == 0 {
+		req.Status = 1
+	}
+
+	t := models.Tunnel{
+		Name:        req.Name,
+		Type:        req.Type,
+		Host:        req.Host,
+		Port:        req.Port,
+		Username:    req.Username,
+		AuthType:    req.AuthType,
+		AuthConfig:  req.AuthConfig,
+		Region:      req.Region,
+		Status:      req.Status,
+		Description: req.Description,
+	}
+	database.DB.Create(&t)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
+}
+
+func UpdateTunnel(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var req CreateTunnelReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
+		return
+	}
+
+	database.DB.Model(&models.Tunnel{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"name":        req.Name,
+		"type":        req.Type,
+		"host":        req.Host,
+		"port":        req.Port,
+		"username":    req.Username,
+		"auth_type":   req.AuthType,
+		"auth_config": req.AuthConfig,
+		"region":      req.Region,
+		"status":      req.Status,
+		"description": req.Description,
+	})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功"})
+}
+
+func DeleteTunnel(c *gin.Context) {
+	id := c.Param("id")
+	database.DB.Delete(&models.Tunnel{}, id)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
+}
+
+func TestTunnelConnection(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var tunnel models.Tunnel
+	if err := database.DB.First(&tunnel, id).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": 404, "message": "隧道节点不存在"})
+		return
+	}
+
+	ok, msg := checkTunnelReachable(tunnel)
+	if ok {
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": msg})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"code": 1, "message": msg})
+	}
+}
+
+func checkTunnelReachable(t models.Tunnel) (bool, string) {
+	addr := fmt.Sprintf("%s:%d", t.Host, t.Port)
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		return false, fmt.Sprintf("无法连接 %s: %s", addr, err.Error())
+	}
+	conn.Close()
+	return true, fmt.Sprintf("连接成功: %s (%s:%d)", t.Name, t.Host, t.Port)
+}
+
+// GetTunnelOptions 供数据源表单下拉
+func GetTunnelOptions(c *gin.Context) {
+	var tunnels []models.Tunnel
+	database.DB.Select("id, name, region").Where("status = 1").Order("id ASC").Find(&tunnels)
+	type opt struct {
+		ID     uint   `json:"id"`
+		Name   string `json:"name"`
+		Region string `json:"region"`
+	}
+	opts := make([]opt, 0, len(tunnels))
+	for _, t := range tunnels {
+		opts = append(opts, opt{ID: t.ID, Name: t.Name, Region: t.Region})
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": opts})
+}
+
+// ── Update Datasource handler to fill tunnel_name ──
+
+type DatasourceListQuery struct {
+	Page     int    `form:"page"`
+	PageSize int    `form:"page_size"`
+	Keyword  string `form:"keyword"`
+	Category string `form:"category"`
+	Type     string `form:"type"`
+	AuthType string `form:"auth_type"`
+	Status   string `form:"status"`
+	Label    string `form:"label"`
+	SortBy   string `form:"sort_by"`
+	SortDesc string `form:"sort_desc"`
+}
+
+func ListDatasourcesWithTunnel(c *gin.Context) {
+	var query DatasourceListQuery
+	c.ShouldBindQuery(&query)
+	if query.Page < 1 {
+		query.Page = 1
+	}
+	if query.PageSize < 1 {
+		query.PageSize = 10
+	}
+
+	var total int64
+	var datasources []models.Datasource
+	tx := database.DB.Model(&models.Datasource{})
+	if query.Category != "" {
+		tx = tx.Where("category = ?", query.Category)
+	}
+	if query.Type != "" {
+		tx = tx.Where("type = ?", query.Type)
+	}
+	if query.AuthType != "" {
+		tx = tx.Where("auth_type = ?", query.AuthType)
+	}
+	if query.Status != "" {
+		if status, err := strconv.Atoi(query.Status); err == nil {
+			tx = tx.Where("status = ?", status)
+		}
+	}
+	if keyword := strings.TrimSpace(query.Keyword); keyword != "" {
+		kw := "%" + keyword + "%"
+		tx = tx.Where(
+			"name LIKE ? OR category LIKE ? OR type LIKE ? OR url LIKE ? OR labels LIKE ? OR labels LIKE ? OR remark LIKE ?",
+			kw, kw, kw, kw, kw, datasourceLabelSearchPattern(keyword), kw,
+		)
+	}
+	if label := strings.TrimSpace(query.Label); label != "" {
+		tx = tx.Where("labels LIKE ?", datasourceLabelSearchPattern(label))
+	}
+	tx.Count(&total)
+	tx.Order(datasourceOrderClause(query.SortBy, query.SortDesc)).Offset((query.Page - 1) * query.PageSize).Limit(query.PageSize).Find(&datasources)
+
+	// fill tunnel names
+	tunnelMap := make(map[uint]string)
+	var tunnels []models.Tunnel
+	database.DB.Select("id, name").Find(&tunnels)
+	for _, t := range tunnels {
+		tunnelMap[t.ID] = t.Name
+	}
+	for i := range datasources {
+		if datasources[i].TunnelID > 0 {
+			datasources[i].TunnelName = tunnelMap[datasources[i].TunnelID]
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "成功",
+		"data": gin.H{
+			"list":      datasources,
+			"total":     total,
+			"page":      query.Page,
+			"page_size": query.PageSize,
+		},
+	})
+}
+
+func datasourceLabelSearchPattern(value string) string {
+	value = strings.TrimSpace(value)
+	for _, separator := range []string{":", "="} {
+		if index := strings.Index(value, separator); index > 0 {
+			key := strings.TrimSpace(value[:index])
+			labelValue := strings.TrimSpace(value[index+1:])
+			if key != "" && labelValue != "" {
+				encodedKey, _ := json.Marshal(key)
+				encodedValue, _ := json.Marshal(labelValue)
+				return "%" + string(encodedKey) + ":" + string(encodedValue) + "%"
+			}
+		}
+	}
+	return "%" + value + "%"
+}
+
+func datasourceOrderClause(sortBy, sortDesc string) string {
+	columns := map[string]string{
+		"id":         "id",
+		"name":       "name",
+		"category":   "category",
+		"type":       "type",
+		"auth_type":  "auth_type",
+		"status":     "status",
+		"created_at": "created_at",
+		"updated_at": "updated_at",
+	}
+	column, ok := columns[sortBy]
+	if !ok {
+		column = "id"
+	}
+	direction := "ASC"
+	if strings.EqualFold(sortDesc, "true") || strings.EqualFold(sortDesc, "desc") || sortDesc == "1" {
+		direction = "DESC"
+	}
+	return column + " " + direction
+}
+
+// ── Override Create/Update Datasource to handle tunnel_id ──
+
+type CreateDatasourceWithTunnelReq struct {
+	Name         string `json:"name" binding:"required"`
+	Category     string `json:"category"`
+	Type         string `json:"type" binding:"required"`
+	URL          string `json:"url"`
+	AuthType     string `json:"auth_type"`
+	AuthConfig   string `json:"auth_config"`
+	Config       string `json:"config"`
+	Labels       string `json:"labels"`
+	Region       string `json:"region"`
+	Env          string `json:"env"`
+	Domain       string `json:"domain"`
+	Capabilities string `json:"capabilities"`
+	Priority     int    `json:"priority"`
+	TunnelID     uint   `json:"tunnel_id"`
+	Status       int    `json:"status"`
+	Remark       string `json:"remark"`
+}
+
+func CreateDatasourceWithTunnel(c *gin.Context) {
+	var req CreateDatasourceWithTunnelReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
+		return
+	}
+	buildAndCreateDatasource(req, c)
+}
+
+func UpdateDatasourceWithTunnel(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var req CreateDatasourceWithTunnelReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
+		return
+	}
+	labels, err := normalizeDatasourceLabels(req.Labels)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	req.Labels = labels
+	if req.Type == "k8s" && strings.TrimSpace(req.URL) == "" {
+		if endpoint := k8sEndpointFromAuthConfig(req.AuthConfig); endpoint != "" {
+			req.URL = endpoint
+		}
+	}
+
+	updates := map[string]interface{}{
+		"name":         req.Name,
+		"category":     categoryOrDefault(req.Category, req.Type),
+		"type":         req.Type,
+		"url":          req.URL,
+		"auth_type":    req.AuthType,
+		"config":       req.Config,
+		"labels":       req.Labels,
+		"region":       req.Region,
+		"env":          req.Env,
+		"domain":       req.Domain,
+		"capabilities": normalizeCapabilities(req.Capabilities, req.Type),
+		"priority":     priorityOrDefault(req.Priority),
+		"tunnel_id":    req.TunnelID,
+		"status":       req.Status,
+		"remark":       req.Remark,
+	}
+	if strings.TrimSpace(req.AuthConfig) != "" {
+		updates["auth_config"] = req.AuthConfig
+	}
+
+	database.DB.Model(&models.Datasource{}).Where("id = ?", id).Updates(updates)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功"})
+}
+
+type BatchDatasourceIDsReq struct {
+	IDs []uint `json:"ids"`
+}
+
+type BatchDatasourceStatusReq struct {
+	IDs    []uint `json:"ids"`
+	Status *int   `json:"status"`
+}
+
+func BatchUpdateDatasourceStatus(c *gin.Context) {
+	var req BatchDatasourceStatusReq
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 || req.Status == nil || (*req.Status != 0 && *req.Status != 1) {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请选择接入并指定正确状态"})
+		return
+	}
+	result := database.DB.Model(&models.Datasource{}).Where("id IN ?", req.IDs).Update("status", *req.Status)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "批量更新状态失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "批量更新成功", "data": gin.H{"updated": result.RowsAffected}})
+}
+
+func BatchDeleteDatasources(c *gin.Context) {
+	var req BatchDatasourceIDsReq
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请选择要删除的接入"})
+		return
+	}
+	var groupCount int64
+	database.DB.Model(&models.DatasourceGroupMember{}).Where("datasource_id IN ?", req.IDs).Count(&groupCount)
+	if groupCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "所选接入仍属于数据源分组，请先从数据源分组移除"})
+		return
+	}
+	result := database.DB.Where("id IN ?", req.IDs).Delete(&models.Datasource{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "批量删除失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "批量删除成功", "data": gin.H{"deleted": result.RowsAffected}})
+}
+
+func buildAndCreateDatasource(req CreateDatasourceWithTunnelReq, c *gin.Context) {
+	labels, err := normalizeDatasourceLabels(req.Labels)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	req.Labels = labels
+	if req.AuthType == "" {
+		req.AuthType = "none"
+	}
+	if req.Category == "" {
+		req.Category = categoryByType(req.Type)
+	}
+	if req.Status == 0 {
+		req.Status = 1
+	}
+	if req.Type == "k8s" && strings.TrimSpace(req.URL) == "" {
+		if endpoint := k8sEndpointFromAuthConfig(req.AuthConfig); endpoint != "" {
+			req.URL = endpoint
+		}
+	}
+
+	ds := models.Datasource{
+		Name:         req.Name,
+		Category:     req.Category,
+		Type:         req.Type,
+		URL:          req.URL,
+		AuthType:     req.AuthType,
+		AuthConfig:   req.AuthConfig,
+		Config:       req.Config,
+		Labels:       req.Labels,
+		Region:       req.Region,
+		Env:          req.Env,
+		Domain:       req.Domain,
+		Capabilities: normalizeCapabilities(req.Capabilities, req.Type),
+		Priority:     priorityOrDefault(req.Priority),
+		TunnelID:     req.TunnelID,
+		Status:       req.Status,
+		Remark:       req.Remark,
+	}
+	database.DB.Create(&ds)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
+}
+
+func normalizeDatasourceLabels(raw string) (string, error) {
+	labels, err := normalizeInspectionLabels(raw)
+	if err != nil {
+		return "", fmt.Errorf("%s", strings.Replace(err.Error(), "任务标签", "接入标签", 1))
+	}
+	return labels, nil
+}
+
+// DatasourceAuthConfig exposes auth fields for test connection
+type DatasourceAuthConfig struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+func GetDatasourceAuth(c *gin.Context) {
+	id := c.Param("id")
+	var ds models.Datasource
+	if err := database.DB.First(&ds, id).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": 404, "message": "数据源不存在"})
+		return
+	}
+	var auth DatasourceAuthConfig
+	if ds.AuthConfig != "" {
+		json.Unmarshal([]byte(ds.AuthConfig), &auth)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0, "message": "成功",
+		"data": gin.H{
+			"id":          ds.ID,
+			"name":        ds.Name,
+			"category":    ds.Category,
+			"type":        ds.Type,
+			"url":         ds.URL,
+			"auth_type":   ds.AuthType,
+			"auth_config": auth,
+			"config":      ds.Config,
+			"tunnel_id":   ds.TunnelID,
+			"status":      ds.Status,
+			"remark":      ds.Remark,
+		},
+	})
+}
+
+func categoryOrDefault(category, dsType string) string {
+	if category != "" {
+		return category
+	}
+	return categoryByType(dsType)
+}

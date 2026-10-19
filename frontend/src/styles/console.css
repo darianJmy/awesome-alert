@@ -1,0 +1,223 @@
+:root {
+  --ops-bg: #f6f8fb;
+  --ops-surface: #ffffff;
+  --ops-surface-soft: #f9fbfd;
+  --ops-border: #dfe6ef;
+  --ops-border-soft: #ecf1f6;
+  --ops-text: #172033;
+  --ops-muted: #667085;
+  --ops-subtle: #98a2b3;
+  --ops-primary: #1769e0;
+  --ops-primary-soft: #eaf2ff;
+  --ops-accent: #0f9f8f;
+  --ops-warning: #b7791f;
+  --ops-danger: #d92d20;
+  --ops-success: #12805c;
+  --ops-radius: 8px;
+  --ops-radius-sm: 6px;
+  --ops-shadow: 0 14px 36px rgba(16, 24, 40, 0.08);
+}
+
+html.dark {
+  --ops-bg: #111827;
+  --ops-surface: #182230;
+  --ops-surface-soft: #202b3a;
+  --ops-border: #344054;
+  --ops-border-soft: #2a3646;
+  --ops-text: #e5e7eb;
+  --ops-muted: #a3adbd;
+  --ops-subtle: #7d899a;
+  --ops-primary-soft: #172b4d;
+  --el-bg-color: #182230;
+  --el-bg-color-page: #111827;
+  --el-bg-color-overlay: #202b3a;
+  --el-fill-color-blank: #182230;
+  --el-fill-color-light: #202b3a;
+  --el-fill-color-lighter: #263244;
+  --el-border-color: #344054;
+  --el-border-color-light: #2f3c4e;
+  --el-border-color-lighter: #2a3646;
+  --el-text-color-primary: #e5e7eb;
+  --el-text-color-regular: #c4cbd5;
+  --el-text-color-secondary: #a3adbd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ops-text);
+  background: var(--ops-bg);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.page-header {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 52px !important;
+  gap: 16px !important;
+  padding: 10px 14px !important;
+  background: var(--ops-surface) !important;
+  border: 1px solid #e5eaf0 !important;
+  border-radius: var(--ops-radius) !important;
+  box-shadow: 0 2px 10px rgba(31, 50, 81, 0.035) !important;
+}
+
+.page-title {
+  display: none !important;
+}
+
+.page-heading {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.page-heading h1 {
+  display: none !important;
+}
+
+.page-heading p {
+  margin: 0;
+  color: var(--ops-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.page-header > .el-button,
+.page-header > .header-actions {
+  margin-left: auto;
+}
+
+.page-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.page-header-meta,
+.page-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 16px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+}
+
+.el-card {
+  --el-card-border-color: var(--ops-border-soft);
+  border-radius: var(--ops-radius);
+  box-shadow: none;
+}
+
+.el-card__body {
+  padding: 18px;
+}
+
+.el-button {
+  border-radius: var(--ops-radius-sm);
+  font-weight: 600;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--ops-primary);
+  --el-button-border-color: var(--ops-primary);
+  --el-button-hover-bg-color: #0f5ecf;
+  --el-button-hover-border-color: #0f5ecf;
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: var(--ops-radius-sm);
+  box-shadow: 0 0 0 1px var(--ops-border) inset;
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px #c7d3e2 inset;
+}
+
+.el-table {
+  --el-table-header-bg-color: var(--ops-surface-soft);
+  --el-table-header-text-color: #344054;
+  --el-table-row-hover-bg-color: #f2f7ff;
+  --el-table-border-color: var(--ops-border-soft);
+  border-radius: var(--ops-radius);
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 700;
+}
+
+.el-tag {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* Element Plus 2.11 may collapse the pagination size selector to its arrow width. */
+.el-pagination .el-pagination__sizes,
+.el-pagination .el-pagination__sizes .el-select {
+  width: 112px;
+  min-width: 112px;
+}
+
+.el-dialog,
+.el-drawer {
+  border-radius: var(--ops-radius);
+}
+
+.el-overlay-dialog {
+  backdrop-filter: blur(2px);
+}
+
+@media (max-width: 900px) {
+  .page-header {
+    align-items: flex-start !important;
+    flex-flow: row wrap !important;
+    min-height: 68px !important;
+    padding: 16px !important;
+  }
+
+  .page-heading {
+    min-width: min(100%, 280px);
+  }
+
+  .page-header-actions,
+  .page-header-meta {
+    margin-left: auto;
+  }
+
+  .search-bar > * {
+    width: 100% !important;
+  }
+}

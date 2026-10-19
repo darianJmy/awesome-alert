@@ -1,9 +1,0 @@
-default:
-  listen: 8777
-
-mysql:
-  host: 122.152.212.112
-  user: root
-  password: Jmy19970420
-  port: 3306
-  database: alert

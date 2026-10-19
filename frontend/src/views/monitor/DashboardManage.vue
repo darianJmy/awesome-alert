@@ -1,0 +1,474 @@
+<template>
+  <div class="page-container">
+    <!-- 列表视图 -->
+    <template v-if="viewMode === 'list'">
+      <section class="dashboard-intro" role="note" aria-label="监控仪表盘简介">
+        <el-icon class="intro-icon" aria-hidden="true"><InfoFilled /></el-icon>
+        <span class="intro-message">集中维护 Grafana 仪表盘嵌入地址，通过卡片快速进入监控视图，适合统一汇总基础设施、应用与业务监控大盘。</span>
+      </section>
+
+      <div class="dashboard-toolbar">
+        <el-input
+          v-model="dashboardSearchInput"
+          clearable
+          aria-label="搜索监控仪表盘"
+          placeholder="仪表盘名称"
+          class="dashboard-search"
+          @keyup.enter="searchDashboards"
+          @clear="searchDashboards"
+        >
+          <template #append>
+            <el-button aria-label="搜索" @click="searchDashboards">
+              <el-icon><Search /></el-icon>
+            </el-button>
+          </template>
+        </el-input>
+        <div class="toolbar-actions">
+          <el-button :icon="Refresh" :loading="loading" @click="fetchData">刷新</el-button>
+          <el-button type="primary" :icon="Plus" @click="handleAdd" v-permission="['dashboard:create']">创建</el-button>
+        </div>
+      </div>
+
+      <div v-if="loading || filteredDashboards.length > 0" v-loading="loading" class="dashboard-grid">
+        <div
+          v-for="(item, idx) in filteredDashboards"
+          :key="item.id"
+          class="dash-card"
+          :class="{ dragging: dragIdx === idx, over: overIdx === idx }"
+          :draggable="!dashboardKeyword"
+          @click="enterDashboard(item)"
+          @dragstart="onDragStart($event, idx)"
+          @dragover.prevent="onDragOver(idx)"
+          @dragleave="onDragLeave"
+          @drop.prevent="onDrop(idx)"
+          @dragend="onDragEnd"
+        >
+          <div class="dash-card-body">
+            <div class="dash-card-icon">
+              <img :src="dashboardConfig.icon" width="30" height="30" alt="" />
+            </div>
+            <div class="dash-card-info">
+              <div class="dash-card-name">{{ item.name }}</div>
+              <div v-if="item.description?.trim()" class="dash-card-desc">{{ item.description }}</div>
+            </div>
+          </div>
+          <div class="dash-card-footer">
+            <div class="dash-card-actions" @click.stop>
+              <el-tooltip content="编辑" placement="top">
+                <el-button link type="primary" size="small" aria-label="编辑" @click="handleEdit(item)" v-permission="['dashboard:edit']">
+                  <el-icon><Edit /></el-icon>
+                </el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button link type="danger" size="small" aria-label="删除" @click="handleDelete(item)" v-permission="['dashboard:delete']">
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <PageEmpty v-if="!loading && filteredDashboards.length === 0" :description="tableData.length ? '没有匹配的监控仪表盘' : '暂无监控仪表盘'" />
+    </template>
+
+    <!-- 预览视图 -->
+    <template v-else>
+      <div class="preview-header">
+        <el-button link type="primary" :icon="ArrowLeft" @click="viewMode = 'list'">返回</el-button>
+        <el-button type="primary" @click="openFullscreen">新窗口打开</el-button>
+      </div>
+      <div class="iframe-wrapper">
+        <div v-if="iframeLoading" class="iframe-loading">
+          <el-icon :size="32" class="is-loading"><Loading /></el-icon>
+          <span>加载中...</span>
+        </div>
+        <iframe
+          v-if="previewUrl"
+          :src="previewUrl"
+          class="preview-iframe"
+          @load="iframeLoading = false"
+        />
+      </div>
+    </template>
+
+    <!-- 新增/编辑抽屉 -->
+    <el-drawer v-model="drawerVisible" class="dashboard-drawer" size="480px" direction="rtl" :show-close="false" :close-on-click-modal="false" destroy-on-close>
+      <template #header>
+        <div class="drawer-header">
+          <el-button text :icon="ArrowLeft" class="drawer-back" @click="drawerVisible = false">返回</el-button>
+          <span class="drawer-title">{{ isEdit ? `编辑${dashboardConfig.shortName}` : `创建${dashboardConfig.shortName}` }}</span>
+        </div>
+      </template>
+      <el-form ref="formRef" class="dashboard-form" :model="form" :rules="rules" label-position="top">
+        <el-form-item prop="name">
+          <template #label>
+            <span class="field-label">
+              名称
+            </span>
+          </template>
+          <el-input v-model="form.name" aria-label="仪表盘名称" />
+        </el-form-item>
+        <el-form-item prop="url">
+          <template #label>
+            <span class="field-label">
+              URL
+              <el-tooltip :content="`${dashboardConfig.urlPlaceholder}；${dashboardConfig.urlHelp}`" placement="top">
+                <button type="button" class="field-help-button" aria-label="URL 填写说明">
+                  <el-icon><QuestionFilled /></el-icon>
+                </button>
+              </el-tooltip>
+            </span>
+          </template>
+          <el-input v-model="form.url" aria-label="仪表盘 URL" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item>
+          <template #label>
+            <span class="field-label">
+              描述
+            </span>
+          </template>
+          <el-input v-model="form.description" aria-label="仪表盘描述" type="textarea" :rows="3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="drawer-footer">
+          <el-button @click="drawerVisible = false">取消</el-button>
+          <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+        </div>
+      </template>
+    </el-drawer>
+  </div>
+</template>
+
+<script setup>
+import PageEmpty from '../../components/PageEmpty.vue'
+import { computed, ref, reactive, onMounted } from 'vue'
+import { getDashboards, createDashboard, updateDashboard, deleteDashboard } from '../../api/dashboard'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, Delete, Edit, InfoFilled, Loading, Plus, QuestionFilled, Refresh, Search } from '@element-plus/icons-vue'
+import grafanaIcon from '../../assets/grafana_icon.svg'
+import aliyunSLSIcon from '../../assets/aliyun_sls.svg'
+
+const props = defineProps({ provider: { type: String, default: 'grafana' } })
+const dashboardConfigs = {
+  grafana: {
+    shortName: '监控仪表盘',
+    icon: grafanaIcon,
+    urlPlaceholder: 'Grafana iframe 链接，如 http://grafana:3000/d-solo/xxx?orgId=1&from=now-6h&to=now&panelId=1',
+    urlHelp: '从 Grafana 面板 Share → Embed 获取 iframe 地址',
+  },
+  aliyun_sls: {
+    shortName: '日志仪表盘',
+    icon: aliyunSLSIcon,
+    urlPlaceholder: '阿里云 SLS 仪表盘的免登录或已授权 iframe 地址',
+    urlHelp: '请填写能够被浏览器 iframe 嵌入的 SLS 仪表盘地址，并确认跨域和登录授权配置',
+  },
+}
+const dashboardConfig = computed(() => dashboardConfigs[props.provider] || dashboardConfigs.grafana)
+
+const loading = ref(false)
+const tableData = ref([])
+const viewMode = ref('list')
+const dashboardSearchInput = ref('')
+const dashboardKeyword = ref('')
+
+const filteredDashboards = computed(() => {
+  const keyword = dashboardKeyword.value.trim().toLowerCase()
+  if (!keyword) return tableData.value
+  return tableData.value.filter(item => String(item.name || '').toLowerCase().includes(keyword))
+})
+
+const drawerVisible = ref(false)
+const saving = ref(false)
+const isEdit = ref(false)
+const formRef = ref()
+const form = reactive({ id: null, provider: props.provider, name: '', url: '', description: '', sort: 0, status: 1 })
+const rules = {
+  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  url: [{ required: true, message: '请输入 iframe URL', trigger: 'blur' }],
+}
+
+const previewUrl = ref('')
+const iframeLoading = ref(true)
+
+// ── 拖拽排序 ──
+const dragIdx = ref(-1)
+const overIdx = ref(-1)
+
+function onDragStart(e, idx) {
+  dragIdx.value = idx
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', String(idx))
+}
+
+function onDragOver(idx) {
+  if (dragIdx.value !== idx) overIdx.value = idx
+}
+
+function onDragLeave() {
+  overIdx.value = -1
+}
+
+async function onDrop(idx) {
+  const from = dragIdx.value
+  overIdx.value = -1
+  dragIdx.value = -1
+  if (from === idx || from < 0) return
+
+  const previous = tableData.value.map(item => ({ ...item }))
+  const list = previous.map(item => ({ ...item }))
+  const [moved] = list.splice(from, 1)
+  list.splice(idx, 0, moved)
+
+  // 更新排序值
+  list.forEach((item, i) => { item.sort = i })
+  tableData.value = list
+
+  // 持久化
+  try {
+    await Promise.all(list.map(item => updateDashboard(item.id, { sort: item.sort })))
+    ElMessage.success('排序已保存')
+  } catch {
+    tableData.value = previous
+    await fetchData()
+  }
+}
+
+function onDragEnd() {
+  dragIdx.value = -1
+  overIdx.value = -1
+}
+
+// ── 业务 ──
+
+onMounted(fetchData)
+
+function searchDashboards() {
+  dashboardKeyword.value = dashboardSearchInput.value
+}
+
+async function fetchData() {
+  loading.value = true
+  try {
+    const res = await getDashboards({ provider: props.provider })
+    tableData.value = (res.data || []).sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+  } finally {
+    loading.value = false
+  }
+}
+
+function enterDashboard(row) {
+  previewUrl.value = row.url
+  iframeLoading.value = true
+  viewMode.value = 'preview'
+}
+
+function handleAdd() {
+  isEdit.value = false
+  const maxSort = tableData.value.reduce((m, i) => Math.max(m, i.sort ?? 0), 0)
+  Object.assign(form, { id: null, provider: props.provider, name: '', url: '', description: '', sort: maxSort + 1, status: 1 })
+  drawerVisible.value = true
+}
+
+function handleEdit(row) {
+  isEdit.value = true
+  Object.assign(form, { id: row.id, provider: props.provider, name: row.name, url: row.url, description: row.description, sort: row.sort, status: row.status })
+  drawerVisible.value = true
+}
+
+async function handleSubmit() {
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+  saving.value = true
+  try {
+    if (isEdit.value) {
+      await updateDashboard(form.id, form)
+      ElMessage.success('更新成功')
+    } else {
+      await createDashboard(form)
+      ElMessage.success('创建成功')
+    }
+    drawerVisible.value = false
+    await fetchData()
+  } catch {}
+  finally { saving.value = false }
+}
+
+async function handleDelete(row) {
+  await ElMessageBox.confirm(`确定删除仪表盘「${row.name}」吗？`, '提示', { type: 'warning' })
+  await deleteDashboard(row.id)
+  ElMessage.success('删除成功')
+  fetchData()
+}
+
+function openFullscreen() {
+  window.open(previewUrl.value, '_blank')
+}
+</script>
+
+<style scoped>
+.page-container { display: flex; flex-direction: column; gap: 16px; }
+.dashboard-intro { display: flex; min-height: 36px; align-items: center; gap: 9px; padding: 7px 12px; color: #536f91; background: #eaf5ff; font-size: 11px; }
+.intro-icon { flex: none; color: #409eff; font-size: 14px; }
+.intro-message { min-width: 0; overflow: hidden; color: #718096; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.dashboard-search { width: 240px; }
+.toolbar-actions { display: flex; align-items: center; gap: 10px; }
+.drawer-header { display: flex; width: 100%; align-items: center; gap: 12px; }
+.drawer-back { margin-left: -8px; color: #3b6ea8; }
+.drawer-title { color: #303133; font-size: 16px; font-weight: 600; }
+.dashboard-form { padding: 2px 0; }
+.field-label { display: inline-flex; align-items: center; gap: 5px; }
+.field-help-button {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: #a3abb8;
+  background: transparent;
+  cursor: help;
+  font-size: 14px;
+}
+.field-help-button:hover,
+.field-help-button:focus-visible { color: #409eff; }
+.field-help-button:focus-visible {
+  border-radius: 50%;
+  outline: 2px solid rgba(64, 158, 255, 0.3);
+  outline-offset: 1px;
+}
+.drawer-footer { display: flex; justify-content: flex-end; gap: 8px; }
+:global(.dashboard-drawer.el-drawer) { border-radius: 0 !important; }
+:global(.dashboard-drawer .el-drawer__header) { margin-bottom: 0; padding: 16px 20px; border-bottom: 1px solid #e5e9f0; }
+:global(.dashboard-drawer .el-drawer__body) { padding: 20px; }
+:global(.dashboard-drawer .el-drawer__footer) { padding: 12px 20px; border-top: 1px solid #e5e9f0; }
+
+/* ── 卡片网格 ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.dash-card {
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+  background: #fff;
+  cursor: grab;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dash-card:active {
+  cursor: grabbing;
+}
+.dash-card:hover {
+  border-color: #409EFF;
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.12);
+  transform: translateY(-2px);
+}
+.dash-card.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+.dash-card.over {
+  border-color: #409EFF;
+  border-style: dashed;
+  background: #ecf5ff;
+}
+
+.dash-card-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 14px;
+}
+.dash-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #fff3e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dash-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.dash-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-card-desc {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dash-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 10px 20px;
+  border-top: 1px solid #f5f5f5;
+  background: #fafbfc;
+}
+.dash-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-card-actions .el-button + .el-button { margin-left: 0; }
+
+/* ── 预览视图 ── */
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.iframe-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: calc(100vh - 160px);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f0f2f5;
+}
+.iframe-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #909399;
+  font-size: 14px;
+}
+.preview-iframe {
+  width: 100%;
+  height: 100%;
+  min-height: calc(100vh - 160px);
+  border: none;
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 900px) {
+  .dashboard-toolbar { align-items: stretch; flex-direction: column; }
+  .dashboard-search { width: 100%; }
+  .toolbar-actions { flex-wrap: wrap; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+}
+</style>
