@@ -163,7 +163,7 @@ AI Orchestrator 不因新增数据源而改主流程。
 
 ### 5. 存储层
 
-业务库 MySQL 保存：
+业务库 SQLite 保存：
 
 - 用户、角色、菜单、权限
 - 数据源配置
@@ -467,7 +467,7 @@ Skill 不能：
 
 现状中已有一些分散逻辑：
 
-- `handlers/chat.go` 中的关键词意图识别
+- `internal/handlers/chat.go` 中的关键词意图识别
 - Prometheus 硬编码查询
 - SLS/CLS/K8s 的局部工具函数
 - 临时的 `k8s.api_get` path 白名单探索
@@ -475,17 +475,17 @@ Skill 不能：
 迁移目标：
 
 1. 保留现有可用能力，避免一次性推倒。
-2. 新增 `backend/ai` 包：
+2. 新增 `ai` 包：
    - `orchestrator.go`
    - `tool_registry.go`
    - `protocol.go`
    - `memory.go`
-3. 新增 `backend/drivers` 包：
+3. 新增 `drivers` 包：
    - `prometheus`
    - `kubernetes`
    - `tencentcls`
    - `aliyunsls`
-4. 将 `handlers/chat.go` 逐步瘦身为 HTTP handler，只负责接收请求和返回结果。
+4. 将 `internal/handlers/chat.go` 逐步瘦身为 HTTP handler，只负责接收请求和返回结果。
 5. 将所有工具调用记录写入消息 metadata 或单独 `ai_tool_calls` 表。
 6. 废弃让 LLM 输出 API path 的长期路线，改为标准业务工具参数。
 

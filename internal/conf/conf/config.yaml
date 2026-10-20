@@ -1,0 +1,16 @@
+# Embedded defaults. External YAML only needs to include overridden values.
+server:
+  addr: ":8080"
+auth:
+  jwt_secret: "aiops-jwt-secret-key-2024"
+database:
+  dsn: "data/aiops.db"
+ai:
+  base_url: "" # Configure your Anthropic-compatible API endpoint before use.
+  api_key: ""
+  model: "deepseek-v4-pro"
+
+log:
+  level: "info"
+  format: "text"
+  file: "" # Optional file path; records are also written to the console.

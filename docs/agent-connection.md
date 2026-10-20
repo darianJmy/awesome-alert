@@ -1,5 +1,7 @@
 # Agent 连接验证
 
+所有源码和构建命令均在项目根目录执行。
+
 Agent 用于让远程机器主动连接平台。当前 Agent 版本为 `0.2.0`，支持心跳、远程命令和自动化任务 Git 制品执行。
 
 ## 平台侧
@@ -20,8 +22,8 @@ curl -fsSL 'https://平台地址/api/agent/install.sh?token=...' | sh
 当前平台需要预置以下二进制：
 
 ```text
-backend/data/agents/aiops-agent-linux-amd64
-backend/data/agents/aiops-agent-linux-arm64
+data/agents/aiops-agent-linux-amd64
+data/agents/aiops-agent-linux-arm64
 ```
 
 ## 源码方式运行
@@ -29,7 +31,6 @@ backend/data/agents/aiops-agent-linux-arm64
 本地调试也可以源码方式运行：
 
 ```bash
-cd backend
 AIOPS_SERVER='ws://平台地址/api/agent/connect' \
 AIOPS_AGENT_TOKEN='创建时显示的 Token' \
 AIOPS_AGENT_REGION='新加坡' \
@@ -41,8 +42,7 @@ go run ./cmd/aiops-agent
 在节点管理中创建“Docker 节点”后，平台会直接生成包含节点 Token、平台地址和镜像名称的 `docker run` 命令。Docker 节点仍使用 Agent 通信协议，但脚本运行在容器环境中。
 
 ```bash
-cd backend
-docker build -f Dockerfile.agent -t aiops-agent:latest .
+docker build -f build/package/Dockerfile.agent -t aiops-agent:latest .
 docker run -d --name aiops-agent \
   --restart unless-stopped \
   --init \
