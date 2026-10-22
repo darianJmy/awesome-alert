@@ -40,8 +40,8 @@
                 <el-icon><Edit /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button link type="danger" size="small" aria-label="删除" @click="removeCenter(center)">
+            <el-tooltip :content="center.is_default ? '默认故障中心不能删除' : '删除'" placement="top">
+              <el-button link type="danger" size="small" aria-label="删除" :disabled="center.is_default" @click="removeCenter(center)">
                 <el-icon><Delete /></el-icon>
               </el-button>
             </el-tooltip>
@@ -139,6 +139,7 @@ async function saveCenter() {
 }
 
 async function removeCenter(center) {
+  if (center.is_default) return
   await ElMessageBox.confirm('已有拨测任务或告警的中心不能删除。', '删除故障中心', { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' })
   await deleteFaultCenter(center.id)
   ElMessage.success('故障中心已删除')

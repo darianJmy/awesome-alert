@@ -387,15 +387,28 @@ func BatchDeleteDatasources(c *gin.Context) {
 }
 
 func buildAndCreateDatasource(req CreateDatasourceWithTunnelReq, c *gin.Context) {
-	if err := normalizeDatasourceReq(&req, nil); err != nil {
+	ds, err := prepareDatasourceForCreate(req)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
 		return
+	}
+	if err := database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		return persistNewDatasource(tx, &ds, req.Status)
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建实例失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
+}
+
+func prepareDatasourceForCreate(req CreateDatasourceWithTunnelReq) (models.Datasource, error) {
+	if err := normalizeDatasourceReq(&req, nil); err != nil {
+		return models.Datasource{}, err
 	}
 
 	labels, err := normalizeDatasourceLabels(req.Labels)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
-		return
+		return models.Datasource{}, err
 	}
 	req.Labels = labels
 	if req.AuthType == "" {
@@ -423,16 +436,14 @@ func buildAndCreateDatasource(req CreateDatasourceWithTunnelReq, c *gin.Context)
 		Status:       req.Status,
 		Remark:       req.Remark,
 	}
-	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&ds).Error; err != nil {
-			return err
-		}
-		return tx.Model(&ds).Update("status", req.Status).Error
-	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建实例失败"})
-		return
+	return ds, nil
+}
+
+func persistNewDatasource(tx *gorm.DB, ds *models.Datasource, status int) error {
+	if err := tx.Create(ds).Error; err != nil {
+		return err
 	}
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
+	return tx.Model(ds).Update("status", status).Error
 }
 
 func normalizeDatasourceLabels(raw string) (string, error) {

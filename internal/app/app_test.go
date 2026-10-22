@@ -19,7 +19,7 @@ func TestInitializeApplicationRejectsInvalidDatabase(t *testing.T) {
 	t.Cleanup(func() { config.AppConfig = previous })
 	t.Setenv("APP_DATABASE_DSN", "mysql://invalid")
 	setArgs(t)
-	app, cleanup, err := InitializeApp()
+	app, cleanup, err := InitializeApp(fstest.MapFS{})
 	if err == nil || !strings.Contains(err.Error(), "SQLite file path") {
 		t.Fatalf("expected DSN error, got %v", err)
 	}
@@ -31,7 +31,7 @@ func TestInitializeApplicationRejectsInvalidDatabase(t *testing.T) {
 func TestInitializeApplicationRejectsMissingConfig(t *testing.T) {
 	previous := config.AppConfig
 	setArgs(t, "--conf", filepath.Join(t.TempDir(), "missing.yaml"))
-	app, cleanup, err := InitializeApp()
+	app, cleanup, err := InitializeApp(fstest.MapFS{})
 	if err == nil || !strings.Contains(err.Error(), "read configuration") {
 		t.Fatalf("expected config error before database initialization, got %v", err)
 	}
@@ -41,7 +41,7 @@ func TestInitializeApplicationRejectsMissingConfig(t *testing.T) {
 }
 
 func TestNewRouterRegistersEmbeddedAssets(t *testing.T) {
-	assets := fstest.MapFS{"dist/index.html": {Data: []byte("<html>app</html>")}}
+	assets := fstest.MapFS{"web/dist/index.html": {Data: []byte("<html>app</html>")}}
 	router, err := newRouter(&gorm.DB{}, assets)
 	if err != nil {
 		t.Fatal(err)

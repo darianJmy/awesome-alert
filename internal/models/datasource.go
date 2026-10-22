@@ -5,7 +5,7 @@ import "time"
 type Datasource struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	Name         string    `gorm:"size:100;not null" json:"name"`
-	Category     string    `gorm:"size:50;default:observability;index" json:"category"` // observability; legacy categories retained for archived records
+	Category     string    `gorm:"size:50;default:observability;index" json:"category"` // Category is assigned by the datasource adapter registry.
 	Type         string    `gorm:"size:50;not null;index" json:"type"`                  // Product type; supported types/capabilities are defined by the adapter registry
 	URL          string    `gorm:"size:500;not null" json:"url"`                        // URL, endpoint, host, or DSN
 	AuthType     string    `gorm:"size:20;default:none" json:"auth_type"`               // none, basic, bearer

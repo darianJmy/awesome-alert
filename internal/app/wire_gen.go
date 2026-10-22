@@ -8,12 +8,13 @@ package app
 
 import (
 	"guanlan/internal/config"
+	"io/fs"
 )
 
 // Injectors from wire.go:
 
 // InitializeApp initializes configuration, logging, database and HTTP routes.
-func InitializeApp() (*App, func(), error) {
+func InitializeApp(assets fs.FS) (*App, func(), error) {
 	v, err := config.InitConfig()
 	if err != nil {
 		return nil, nil, err
@@ -27,8 +28,7 @@ func InitializeApp() (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	fs := embeddedAssets()
-	engine, err := newRouter(db, fs)
+	engine, err := newRouter(db, assets)
 	if err != nil {
 		cleanup2()
 		cleanup()

@@ -15,8 +15,8 @@ flowchart TD
     SDK --> MODEL
     MODEL --> GATEWAY[NewAPI / Anthropic 模型服务]
     CORE --> TOOLS[Eino InvokableTool 适配器]
-    TOOLS --> POLICY[只读策略、参数检查、RBAC、截止时间]
-    POLICY --> BIZ[现有监控与平台查询业务适配器]
+    TOOLS --> POLICY[风险分级、参数检查、RBAC、截止时间]
+    POLICY --> BIZ[现有监控与平台业务适配器]
     BIZ --> DATA[(数据源 / SQLite)]
     MCP[外部 MCP 客户端] --> MCPSERVER[MCP Server]
     MCPSERVER --> BIZ
@@ -56,11 +56,11 @@ flowchart TD
 
 1. 新模型供应商：在 provider 工厂增加官方 Eino `ToolCallingChatModel` 适配器及协议测试。NewAPI 中切换已支持的模型通常仅修改配置。
 2. 新本地工具：注册业务工具，声明参数、风险、超时，绑定对应权限；由 Eino 工具适配器生成 ToolInfo，不能绕过统一策略直接执行业务。
-3. 参数声明：直接使用 Eino `schema.ParameterInfo`，经 `ParamsOneOf` 生成标准 JSON Schema。服务端用同一契约校验整数、数字、字符串、枚举、必填、布尔、对象和数组；拒绝未知字段、null、过深嵌套及超大数组。新增参数不能绕过后端校验。
-4. 新业务 service：以普通 Go service 实现查询，把身份/范围经后端校验后传入。工具不能接收模型提供的 URL、认证头或任意命令。
-5. 外部 MCP：当前实现是平台 MCP Server 与内置助手复用本地业务。未来接入远程 MCP Client 时，注册得到的工具仍需映射权限、只读风险和超时，不自动信任远端声明。
+3. 参数声明：直接使用 Eino `schema.ParameterInfo`，经 `ParamsOneOf` 生成标准 JSON Schema。服务端用同一契约校验整数、数字、字符串、枚举、必填、布尔、对象和数组；拒绝未知字段、null、过深嵌套及超大数组。新增参数不能绕过后端校验。平台 MCP 工具的对象、数组和布尔参数映射为相同的 Eino 契约，调用端还校验最小/最大值、文本长度和数组长度。
+4. 新业务 service：以普通 Go service 实现查询，把身份/范围经后端校验后传入。查询和连接测试只接收已有资源 ID，不接收任意认证头或命令。创建数据源是显式例外：可接收用户提供的无凭据 HTTP/HTTPS 地址，复用页面校验后仅保存，不在创建时访问地址。
+5. 外部 MCP：当前实现是平台 MCP Server 与内置助手复用本地业务。未来接入远程 MCP Client 时，注册得到的工具仍需映射权限、风险等级和超时，不自动信任远端声明。
 6. 检索、记忆、计划型工作流：分别扩展运行输入/上下文装配或新增 Eino Graph，不改模型传输层。检索内容不能覆盖后端执行策略。
-7. 写操作：先实现服务端审批、参数绑定、过期与幂等，再新增执行策略；不能仅靠模型或提示词“确认”。
+7. 写操作：当前将服务端工具定义中显式标记 `AssistantWritable` 的创建工具注册为 `write_low`（数据源、故障中心、数据源分组、两类规则组、通知模板、邮件对象），按用户明确请求执行；注册和调用时检查创建权限，共用业务校验，创建与审计同事务，拦截同名重复创建。需要认证或隧道的创建仍在页面完成。`write_requires_confirmation` 继续被执行层拒绝；删除、改配置、脚本执行等后续需要服务端审批、参数绑定、过期与幂等后才能开放。
 
 ## 页面管理模型
 

@@ -34,8 +34,8 @@ func (o *Orchestrator) execute(ctx context.Context, call ToolCall) ToolResult {
 	if !ok {
 		return denied("UNKNOWN_TOOL", "工具未注册")
 	}
-	if tool.Spec.Risk != RiskReadonlyLow && tool.Spec.Risk != RiskReadonlyExpensive {
-		return denied("READ_ONLY_REQUIRED", "当前 AI 执行链路仅允许只读操作")
+	if tool.Spec.Risk != RiskReadonlyLow && tool.Spec.Risk != RiskReadonlyExpensive && tool.Spec.Risk != RiskWriteLow {
+		return denied("READ_ONLY_REQUIRED", "该风险等级的操作尚未向 AI 助手开放")
 	}
 	if err := validateParams(tool.Spec, call.Params); err != nil {
 		return denied("INVALID_PARAMS", err.Error())
@@ -60,6 +60,11 @@ func (o *Orchestrator) execute(ctx context.Context, call ToolCall) ToolResult {
 		return denied("TOOL_TIMEOUT", "工具调用已超时或取消")
 	}
 	return result
+}
+
+// ValidateToolParams exposes the execution contract to local MCP adapters as well.
+func ValidateToolParams(spec ToolSpec, params map[string]interface{}) error {
+	return validateParams(spec, params)
 }
 
 // Validate the same Eino parameter contract used to generate the model's JSON Schema.

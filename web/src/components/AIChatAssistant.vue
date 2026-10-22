@@ -4,7 +4,7 @@
       <el-button link :icon="Fold" aria-label="会话历史" title="会话历史" :aria-expanded="historyVisible" @click="historyVisible = !historyVisible" />
       <div class="chat-title">
         <strong>{{ activeTitle }}</strong>
-        <small>{{ sending ? '正在分析…' : '就绪 · 只读查询' }}</small>
+        <small>{{ sending ? '正在分析…' : '就绪 · 运维助手' }}</small>
       </div>
       <el-button link :icon="Plus" aria-label="新会话" title="新会话" :disabled="sending || loadingMessages" @click="newConversation" />
       <el-button link :icon="Close" aria-label="关闭 AI 助手" title="关闭 AI 助手" @click="$emit('close')" />
@@ -35,7 +35,7 @@
         <section v-if="!activeConversationID && !messages.length" class="chat-welcome">
           <span class="welcome-icon"><Cpu /></span>
           <h2>有什么可以帮你？</h2>
-          <p>查询指标、告警或任务，结合执行详情了解分析过程。</p>
+          <p>查询告警、证书和执行记录，也可以帮你创建分组和通知配置。</p>
           <div class="suggestions">
             <button v-for="item in suggestions" :key="item" type="button" @click="quickAsk(item)">{{ item }}</button>
           </div>
@@ -126,7 +126,9 @@ const suggestions = [
   '现在有哪些活跃告警？',
   '最近失败的拨测任务有哪些？',
   '帮我查看自动化任务执行情况',
-  '平台目前有哪些数据源？',
+  '未来 30 天有哪些证书需要续期？',
+  '最近有哪些通知发送失败？',
+  '创建邮件通知对象需要哪些信息？',
 ]
 
 const filteredConversations = computed(() => conversations.value.filter(item => (item.title || '新对话').toLowerCase().includes(historySearch.value.trim().toLowerCase())))

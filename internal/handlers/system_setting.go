@@ -52,16 +52,6 @@ type ldapYAMLConfig struct {
 	Connection ldapConnectionYAML `yaml:"connection"`
 	UserSearch ldapUserSearchYAML `yaml:"user_search"`
 	Attributes ldapAttributesYAML `yaml:"attributes"`
-
-	// Keep accepting the first flat schema so existing API clients can migrate safely.
-	URL             string `yaml:"url,omitempty"`
-	BaseDN          string `yaml:"base_dn,omitempty"`
-	BindDN          string `yaml:"bind_dn,omitempty"`
-	BindPassword    string `yaml:"bind_password,omitempty"`
-	UserFilter      string `yaml:"user_filter,omitempty"`
-	UsernameAttr    string `yaml:"username_attribute,omitempty"`
-	DisplayNameAttr string `yaml:"display_name_attribute,omitempty"`
-	EmailAttr       string `yaml:"email_attribute,omitempty"`
 }
 
 type ldapConnectionYAML struct {
@@ -198,10 +188,6 @@ func TestOIDCSettings(c *gin.Context) {
 func loadSystemSetting() models.SystemSetting {
 	item := models.SystemSetting{ID: 1, SystemName: "观澜运维平台", SystemSubtitle: "智能运维控制台", DefaultTheme: "system"}
 	database.DB.FirstOrCreate(&item, models.SystemSetting{ID: 1})
-	// 兼容旧安装的默认名称，保留用户自定义的系统名称。
-	if item.SystemName == "运维中枢" {
-		item.SystemName = "观澜运维平台"
-	}
 	return item
 }
 
@@ -339,26 +325,14 @@ func applyLDAPYAMLConfig(req saveAuthSettingReq) (saveAuthSettingReq, error) {
 	if err := decoder.Decode(&config); err != nil {
 		return req, errors.New("LDAP YAML 配置格式不正确：" + err.Error())
 	}
-	usesNestedSchema := config.Connection.URL != "" || config.Connection.BindDN != "" || config.UserSearch.BaseDN != "" || config.UserSearch.Filter != "" || config.Attributes.Username != "" || config.Attributes.DisplayName != "" || config.Attributes.Email != ""
-	if usesNestedSchema {
-		req.LDAPURL = config.Connection.URL
-		req.LDAPBaseDN = config.UserSearch.BaseDN
-		req.LDAPBindDN = config.Connection.BindDN
-		req.LDAPBindPassword = config.Connection.BindPassword
-		req.LDAPUserFilter = config.UserSearch.Filter
-		req.LDAPUsernameAttr = config.Attributes.Username
-		req.LDAPDisplayNameAttr = config.Attributes.DisplayName
-		req.LDAPEmailAttr = config.Attributes.Email
-		return req, nil
-	}
-	req.LDAPURL = config.URL
-	req.LDAPBaseDN = config.BaseDN
-	req.LDAPBindDN = config.BindDN
-	req.LDAPBindPassword = config.BindPassword
-	req.LDAPUserFilter = config.UserFilter
-	req.LDAPUsernameAttr = config.UsernameAttr
-	req.LDAPDisplayNameAttr = config.DisplayNameAttr
-	req.LDAPEmailAttr = config.EmailAttr
+	req.LDAPURL = config.Connection.URL
+	req.LDAPBaseDN = config.UserSearch.BaseDN
+	req.LDAPBindDN = config.Connection.BindDN
+	req.LDAPBindPassword = config.Connection.BindPassword
+	req.LDAPUserFilter = config.UserSearch.Filter
+	req.LDAPUsernameAttr = config.Attributes.Username
+	req.LDAPDisplayNameAttr = config.Attributes.DisplayName
+	req.LDAPEmailAttr = config.Attributes.Email
 	return req, nil
 }
 

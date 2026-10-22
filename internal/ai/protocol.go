@@ -8,6 +8,7 @@ import (
 type RiskLevel string
 
 const (
+	RiskWriteLow          RiskLevel = "write_low"
 	RiskReadonlyLow       RiskLevel = "readonly_low"
 	RiskReadonlyExpensive RiskLevel = "readonly_expensive"
 	RiskWriteConfirm      RiskLevel = "write_requires_confirmation"

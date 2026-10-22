@@ -46,6 +46,11 @@
           </el-breadcrumb>
         </div>
         <div class="header-right">
+          <a class="theme-trigger" href="https://github.com/darianJmy/awesome-alert" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目仓库（新标签页打开）" title="GitHub 项目仓库">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .75a11.25 11.25 0 0 0-3.558 21.923c.563.104.768-.244.768-.542 0-.267-.01-.974-.015-1.912-3.13.68-3.79-1.508-3.79-1.508-.512-1.3-1.25-1.646-1.25-1.646-1.023-.7.078-.686.078-.686 1.13.08 1.725 1.16 1.725 1.16 1.005 1.722 2.638 1.225 3.28.937.102-.728.393-1.225.715-1.507-2.498-.284-5.124-1.249-5.124-5.563 0-1.23.44-2.234 1.16-3.022-.116-.285-.503-1.43.11-2.98 0 0 .945-.303 3.094 1.154A10.79 10.79 0 0 1 12 6.18c.956.004 1.918.129 2.817.378 2.148-1.457 3.091-1.154 3.091-1.154.615 1.55.228 2.695.112 2.98.722.788 1.158 1.792 1.158 3.022 0 4.325-2.63 5.276-5.136 5.555.404.35.765 1.042.765 2.1 0 1.516-.014 2.74-.014 3.112 0 .3.203.651.774.541A11.252 11.252 0 0 0 12 .75Z" />
+            </svg>
+          </a>
           <button ref="aiTrigger" type="button" class="theme-trigger ai-header-trigger" :class="{ 'is-active': aiVisible }" :aria-expanded="aiVisible" aria-controls="guanlan-ai-panel" aria-label="AI 助手" title="AI 助手" @click="aiVisible = !aiVisible">
             <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
               <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">

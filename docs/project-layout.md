@@ -3,7 +3,7 @@
 本项目参照 `golang-standards/project-layout` 中的常用目录约定，保留实际使用的目录。
 
 - `.air.toml`：本地开发热重载配置，通过 `make dev` 使用。
-- `cmd/guanlan`：服务端入口；发布后运行 `./guanlan`。
+- `main.go`：服务端入口和前端静态资源嵌入声明；发布后运行 `./guanlan`。
 - `cmd/aiops-agent`：独立 Agent 入口。
 - `internal/app`：应用生命周期与 Wire 依赖装配。生成代码同目录保存。
 - `internal/conf`：配置解析及 `conf/config.yaml` 内嵌默认值。
@@ -13,10 +13,10 @@
 - `internal/database`：业务表清单、版本号和种子数据，调用公共数据库组件。
 - `internal/middleware`：依赖用户、角色和审计模型的业务鉴权与审计。
 - 其他 `internal` 包：API、业务模型、鉴权、AI、Agent 等私有实现。
-- `web`：Vue 项目；`embed.go` 将 `dist` 嵌入 Go 二进制。
+- `web`：Vue 项目；根目录 `main.go` 将 `web/dist` 嵌入 Go 二进制。
 - `configs`：外部配置示例，默认运行无需复制该目录。
 - `build/package`：容器等打包定义；Docker 构建上下文为仓库根目录。
-- `deployments/migrations`：数据库部署说明和只供旧版使用的 MySQL SQL。
+- `deployments/migrations`：当前 SQLite 数据库初始化与开发环境结构调整说明。
 - `assets`：项目图片和图标。
 - `docs`：设计与使用文档。
 - `test/artifacts`：浏览器验证截图与辅助测试产物。

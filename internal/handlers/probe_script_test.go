@@ -213,13 +213,6 @@ func TestScriptProbeSchedulerAndRetiredTasks(t *testing.T) {
 	legacy := models.ScheduledTask{Name: "old cron", Type: "script", TargetID: script.ID, CronExpr: "* * * * *", Status: 1}
 	db.Create(&legacy)
 	now := time.Now()
-	legacyAlert := models.AlertInstance{Source: "scheduled-task", SourceID: legacy.ID, Status: alertStatusFiring, StartedAt: now, LastEventAt: now, StateChangedAt: now}
-	db.Create(&legacyAlert)
-	retireScheduledTaskAlerts(now)
-	db.First(&legacyAlert, legacyAlert.ID)
-	if legacyAlert.Status != alertStatusTerminated {
-		t.Fatalf("legacy alert remains active: %+v", legacyAlert)
-	}
 	runDueInspectionItems(now)
 	deadline := time.Now().Add(5 * time.Second)
 	for len(inspectionWorkers) > 0 && time.Now().Before(deadline) {

@@ -3,16 +3,17 @@ package models
 import "time"
 
 type NotificationChannel struct {
-	ID               uint      `gorm:"primaryKey" json:"id"`
-	Name             string    `gorm:"size:128;not null;index" json:"name"`
-	Type             string    `gorm:"size:30;not null;default:webhook;index" json:"type"`
-	TemplateID       uint      `gorm:"index" json:"template_id"`
-	WebhookURLCipher string    `gorm:"type:longtext" json:"-"`
-	SignSecretCipher string    `gorm:"type:longtext" json:"-"`
-	Status           int       `gorm:"not null;default:1;index" json:"status"`
-	Description      string    `gorm:"size:500" json:"description"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                  uint      `gorm:"primaryKey" json:"id"`
+	Name                string    `gorm:"size:128;not null;index" json:"name"`
+	Type                string    `gorm:"size:30;not null;default:webhook;index" json:"type"`
+	TemplateID          uint      `gorm:"index" json:"template_id"`
+	WebhookURLCipher    string    `gorm:"type:longtext" json:"-"`
+	EmailRecipientsJSON string    `gorm:"type:longtext" json:"-"`
+	SignSecretCipher    string    `gorm:"type:longtext" json:"-"`
+	Status              int       `gorm:"not null;default:1;index" json:"status"`
+	Description         string    `gorm:"size:500" json:"description"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 type NotificationTemplate struct {

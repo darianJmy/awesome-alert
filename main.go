@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"errors"
 	"flag"
 	"guanlan/internal/app"
@@ -8,8 +9,11 @@ import (
 	"os"
 )
 
+//go:embed web/dist
+var staticFiles embed.FS
+
 func main() {
-	a, cleanup, err := app.InitializeApp()
+	a, cleanup, err := app.InitializeApp(staticFiles)
 	if errors.Is(err, flag.ErrHelp) {
 		return
 	}

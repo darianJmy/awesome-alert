@@ -12,7 +12,6 @@ var inspectionWorkers = make(chan struct{}, 8)
 
 func StartScheduler() {
 	schedulerOnce.Do(func() {
-		retireScheduledTaskAlerts(time.Now())
 		go schedulerLoop()
 	})
 }
@@ -74,14 +73,4 @@ func inspectionTaskDue(item models.InspectionItem, now time.Time) bool {
 		interval = 300
 	}
 	return item.LastRunAt == nil || now.Sub(*item.LastRunAt) >= time.Duration(interval)*time.Second
-}
-
-// Old schedules are no longer executed. Preserve their records, but stop repeats
-// for any alarms that can no longer receive a recovery result.
-func retireScheduledTaskAlerts(now time.Time) {
-	var ids []uint
-	database.DB.Model(&models.AlertInstance{}).Where("source = ? AND status IN ?", "scheduled-task", []string{alertStatusPending, alertStatusFiring, alertStatusRecovering}).Distinct("source_id").Pluck("source_id", &ids)
-	for _, id := range ids {
-		terminateTaskAlerts("scheduled-task", id, "scheduled_task_retired", now)
-	}
 }

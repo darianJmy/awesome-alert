@@ -121,6 +121,7 @@ import { ArrowLeft, Delete, Edit, InfoFilled, Plus, QuestionFilled, Refresh, Sea
 import feishuIcon from '../../assets/feishu.svg'
 import emailIcon from '../../assets/email.svg'
 import dingdingIcon from '../../assets/dingding.svg'
+import qywechatIcon from '../../assets/qywechat.svg'
 import {
   createNotificationTemplate,
   deleteNotificationTemplate,
@@ -129,6 +130,7 @@ import {
 } from '../../api/notification'
 
 const templateTypes = [
+  { value: 'qywechat', label: '企业微信', icon: qywechatIcon },
   { value: 'feishu', label: '飞书', icon: feishuIcon },
   { value: 'email', label: '邮件', icon: emailIcon },
   { value: 'dingding', label: '钉钉', icon: dingdingIcon },

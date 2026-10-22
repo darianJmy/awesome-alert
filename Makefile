@@ -14,7 +14,7 @@ dev-web:
 	@test -f web/dist/index.html || $(MAKE) web
 
 build: web
-	CGO_ENABLED=0 go build -trimpath -o guanlan ./cmd/guanlan
+	CGO_ENABLED=0 go build -trimpath -o guanlan .
 
 web:
 	cd web && npm ci && npm run build

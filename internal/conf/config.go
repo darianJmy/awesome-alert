@@ -19,7 +19,18 @@ var configYaml []byte
 
 type LogConfig = logger.Config
 
+// SMTPConfig is shared by all email notification recipients.
+type SMTPConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Security string `mapstructure:"security"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	From     string `mapstructure:"from"`
+}
+
 type Config struct {
+	SMTP       SMTPConfig
 	Log        LogConfig
 	ServerPort string
 	JWTSecret  string
@@ -27,7 +38,8 @@ type Config struct {
 }
 
 type fileConfig struct {
-	Log    LogConfig `mapstructure:"log"`
+	SMTP   SMTPConfig `mapstructure:"smtp"`
+	Log    LogConfig  `mapstructure:"log"`
 	Server struct {
 		Addr string `mapstructure:"addr"`
 	} `mapstructure:"server"`
@@ -40,15 +52,21 @@ type fileConfig struct {
 }
 
 var bindings = []struct {
-	key   string
-	names []string
+	key  string
+	name string
 }{
-	{"log.level", []string{"APP_LOG_LEVEL"}},
-	{"log.format", []string{"APP_LOG_FORMAT"}},
-	{"log.file", []string{"APP_LOG_FILE"}},
-	{"server.addr", []string{"APP_SERVER_ADDR", "SERVER_PORT"}},
-	{"auth.jwt_secret", []string{"APP_AUTH_JWT_SECRET", "JWT_SECRET"}},
-	{"database.dsn", []string{"APP_DATABASE_DSN", "DB_DSN"}},
+	{"smtp.host", "APP_SMTP_HOST"},
+	{"smtp.port", "APP_SMTP_PORT"},
+	{"smtp.security", "APP_SMTP_SECURITY"},
+	{"smtp.username", "APP_SMTP_USERNAME"},
+	{"smtp.password", "APP_SMTP_PASSWORD"},
+	{"smtp.from", "APP_SMTP_FROM"},
+	{"log.level", "APP_LOG_LEVEL"},
+	{"log.format", "APP_LOG_FORMAT"},
+	{"log.file", "APP_LOG_FILE"},
+	{"server.addr", "APP_SERVER_ADDR"},
+	{"auth.jwt_secret", "APP_AUTH_JWT_SECRET"},
+	{"database.dsn", "APP_DATABASE_DSN"},
 }
 
 func defaults() (*viper.Viper, error) {
@@ -98,22 +116,12 @@ func InitConfig(path string) (Config, error) {
 	}
 	v.AllowEmptyEnv(true)
 	for _, binding := range bindings {
-		if err := v.BindEnv(append([]string{binding.key}, binding.names...)...); err != nil {
+		if err := v.BindEnv(binding.key, binding.name); err != nil {
 			return Config{}, fmt.Errorf("bind environment %s: %w", binding.key, err)
 		}
-		hasEnv := false
-		for _, name := range binding.names {
-			if _, ok := os.LookupEnv(name); ok {
-				hasEnv = true
-				break
-			}
-		}
-		if !hasEnv {
-			for _, name := range binding.names {
-				if value, ok := envFile[name]; ok {
-					v.Set(binding.key, value)
-					break
-				}
+		if _, present := os.LookupEnv(binding.name); !present {
+			if value, ok := envFile[binding.name]; ok {
+				v.Set(binding.key, value)
 			}
 		}
 	}
@@ -155,6 +163,7 @@ func decode(v *viper.Viper) (Config, error) {
 	}
 	return Config{
 		Log:        raw.Log,
+		SMTP:       raw.SMTP,
 		ServerPort: raw.Server.Addr, JWTSecret: raw.Auth.JWTSecret, DBDSN: raw.Database.DSN,
 	}, nil
 }

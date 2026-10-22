@@ -21,13 +21,14 @@ import (
 )
 
 type saveNotificationChannelReq struct {
-	Name        string `json:"name" binding:"required"`
-	Type        string `json:"type"`
-	TemplateID  uint   `json:"template_id"`
-	WebhookURL  string `json:"webhook_url"`
-	SignSecret  string `json:"sign_secret"`
-	Status      int    `json:"status"`
-	Description string `json:"description"`
+	Name            string   `json:"name" binding:"required"`
+	Type            string   `json:"type"`
+	TemplateID      uint     `json:"template_id"`
+	WebhookURL      string   `json:"webhook_url"`
+	SignSecret      string   `json:"sign_secret"`
+	Status          int      `json:"status"`
+	Description     string   `json:"description"`
+	EmailRecipients []string `json:"email_recipients"`
 }
 
 type saveNotificationTemplateReq struct {
@@ -161,27 +162,26 @@ func CreateNotificationChannel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请选择高级模板"})
 		return
 	}
-	webhookURL, err := encryptWebhookURL(req.WebhookURL)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
-		return
-	}
 	channelType := notificationType(req.Type)
-	signSecret, err := encryptSignSecret(channelType, req.SignSecret, nil)
+	config, err := prepareNotificationChannel(req, nil)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
 		return
 	}
 	item := models.NotificationChannel{
-		Name:             strings.TrimSpace(req.Name),
-		Type:             channelType,
-		TemplateID:       req.TemplateID,
-		WebhookURLCipher: webhookURL,
-		SignSecretCipher: signSecret,
-		Status:           normalizedStatus(req.Status),
-		Description:      strings.TrimSpace(req.Description),
+		Name:                strings.TrimSpace(req.Name),
+		Type:                channelType,
+		TemplateID:          req.TemplateID,
+		WebhookURLCipher:    config.WebhookURLCipher,
+		SignSecretCipher:    config.SignSecretCipher,
+		EmailRecipientsJSON: config.EmailRecipientsJSON,
+		Status:              normalizedStatus(req.Status),
+		Description:         strings.TrimSpace(req.Description),
 	}
-	database.DB.Create(&item)
+	if err := database.DB.Create(&item).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建通知对象失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功", "data": notificationChannelResponse(item)})
 }
 
@@ -208,30 +208,28 @@ func UpdateNotificationChannel(c *gin.Context) {
 		"status":      normalizedStatus(req.Status),
 		"description": strings.TrimSpace(req.Description),
 	}
-	if strings.TrimSpace(req.WebhookURL) != "" {
-		webhookURL, err := encryptWebhookURL(req.WebhookURL)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
-			return
-		}
-		updates["webhook_url_cipher"] = webhookURL
+	if channelType != existing.Type {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "通知类型不能修改，请新建通知对象"})
+		return
 	}
-	if strings.TrimSpace(req.SignSecret) == "" {
-		updates["sign_secret_cipher"] = ""
-	} else {
-		signSecret, err := encryptSignSecret(channelType, req.SignSecret, &existing)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
-			return
-		}
-		updates["sign_secret_cipher"] = signSecret
+	config, err := prepareNotificationChannel(req, &existing)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
 	}
-	database.DB.Model(&models.NotificationChannel{}).Where("id = ?", c.Param("id")).Updates(updates)
+	updates["webhook_url_cipher"] = config.WebhookURLCipher
+	updates["sign_secret_cipher"] = config.SignSecretCipher
+	updates["email_recipients_json"] = config.EmailRecipientsJSON
+	if err := database.DB.Model(&existing).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新通知对象失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功"})
 }
 
 func notificationChannelResponse(item models.NotificationChannel) gin.H {
 	return gin.H{
+		"email_recipients":       emailRecipients(item),
 		"id":                     item.ID,
 		"name":                   item.Name,
 		"type":                   item.Type,
@@ -481,11 +479,40 @@ func sendWebhook(channel models.NotificationChannel, body []byte) error {
 	switch channel.Type {
 	case "feishu":
 		return sendFeishuWebhook(channel, body)
-	case "smart", "urgent_assistant", "email", "dingding", "qywechat", "slack", "customhook", "webhook":
+	case "qywechat":
+		return sendWeComWebhook(channel, body)
+	case "email":
+		return sendSMTPNotification(channel, body)
+	case "dingding":
+		return sendDingTalkWebhook(channel, body)
+	case "smart", "urgent_assistant", "slack", "customhook", "webhook":
 	default:
 		return fmt.Errorf("暂不支持的通知类型: %s", channel.Type)
 	}
 	return postWebhook(channel, body, "Webhook")
+}
+
+func sendWeComWebhook(channel models.NotificationChannel, body []byte) error {
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return fmt.Errorf("企业微信通知内容无效: %w", err)
+	}
+	title := notificationStringFromMap(data, "title")
+	content := notificationStringFromMap(data, "content")
+	if title != "" {
+		content = "### " + title + "\n\n" + content
+	}
+	if len(content) > 4096 {
+		return errors.New("企业微信 Markdown 通知内容不能超过 4096 字节，请精简通知模板或减少分组告警数量")
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"msgtype":  "markdown",
+		"markdown": map[string]string{"content": content},
+	})
+	if err != nil {
+		return err
+	}
+	return postWebhook(channel, payload, "企业微信 Webhook")
 }
 
 func sendFeishuWebhook(channel models.NotificationChannel, body []byte) error {
@@ -568,6 +595,9 @@ func postWebhook(channel models.NotificationChannel, body []byte, name string) e
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("%s 返回 %d: %s", name, resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
+	if err := checkRobotResponse(channel.Type, respBody); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -611,7 +641,7 @@ func decryptedOptionalSecret(cipherText string) string {
 
 func encryptSignSecret(channelType, value string, existing *models.NotificationChannel) (string, error) {
 	value = strings.TrimSpace(value)
-	if channelType != "feishu" {
+	if channelType != "feishu" && channelType != "dingding" {
 		return "", nil
 	}
 	if value == "" {

@@ -25,7 +25,7 @@ func TestBuildPromAlertResultSnapshotContainsRelevantEvaluationContext(t *testin
 		ForSeconds: 600, RecoveryWaitSeconds: 60, NoDataPolicy: "resolve", EvaluationIntervalSeconds: 30,
 		Severity: "P1",
 		Labels:   `{"team":"platform","severity":"P1"}`, Annotations: `{"description":"api-1 is slow"}`,
-		FaultCenterID: 8, DatasourceMode: "combined", Status: 1,
+		FaultCenterID: 8, Status: 1,
 	}
 	datasource := models.Datasource{ID: 5, Name: "prod-prometheus", Type: "prometheus", Category: "observability", URL: "http://prometheus:9090", Labels: `{"cluster":"prod-a"}`, Env: "prod", Region: "cn-east"}
 	labels := map[string]string{"instance": "api-1", "job": "api"}
@@ -377,8 +377,8 @@ func TestApplyAlertRuleConditions(t *testing.T) {
 	rule := models.AlertRule{Severity: "P1", ForSeconds: 30}
 	series := []promVectorSeries{{Labels: map[string]string{"instance": "node-1"}, Value: "85"}}
 	conditions := []models.AlertRuleCondition{
-		{ID: 1, Severity: "P2", Operator: ">", Threshold: 80, ForSeconds: 60},
-		{ID: 2, Severity: "P0", Operator: ">", Threshold: 90, ForSeconds: 10},
+		{ID: 1, Severity: "P2", Operator: ">", Threshold: 80},
+		{ID: 2, Severity: "P0", Operator: ">", Threshold: 90},
 	}
 	matched := applyAlertRuleConditions(series, conditions, rule)
 	if len(matched) != 1 || matched[0].ConditionID != 1 || matched[0].Severity != "P2" || matched[0].ForSeconds != 30 {
@@ -393,9 +393,9 @@ func TestApplyAlertRuleConditionsChoosesHighestSeverityPerSeries(t *testing.T) {
 	rule := models.AlertRule{Severity: "P2", ForSeconds: 60}
 	series := []promVectorSeries{{Labels: map[string]string{"instance": "node-1"}, Value: "95"}}
 	conditions := []models.AlertRuleCondition{
-		{ID: 1, Severity: "P2", Operator: ">", Threshold: 70, ForSeconds: 60},
-		{ID: 2, Severity: "P1", Operator: ">", Threshold: 80, ForSeconds: 30},
-		{ID: 3, Severity: "P0", Operator: ">", Threshold: 90, ForSeconds: 10},
+		{ID: 1, Severity: "P2", Operator: ">", Threshold: 70},
+		{ID: 2, Severity: "P1", Operator: ">", Threshold: 80},
+		{ID: 3, Severity: "P0", Operator: ">", Threshold: 90},
 	}
 	matched := applyAlertRuleConditions(series, conditions, rule)
 	if len(matched) != 1 {
@@ -426,18 +426,14 @@ func TestAlertEvaluationActionMatchesPrometheusNoDataSemantics(t *testing.T) {
 func TestNormalizeAlertRuleConditionsLimitsSeverityAndOperators(t *testing.T) {
 	threshold := 80.0
 	valid, err := normalizeAlertRuleConditions([]saveAlertRuleConditionReq{
-		{Severity: "P0", Operator: ">=", Threshold: &threshold, ForSeconds: 30},
-		{Severity: "P1", Operator: "<", Threshold: &threshold, ForSeconds: 60},
-		{Severity: "P2", Operator: "!=", Threshold: &threshold, ForSeconds: 90},
+		{Severity: "P0", Operator: ">=", Threshold: &threshold},
+		{Severity: "P1", Operator: "<", Threshold: &threshold},
+		{Severity: "P2", Operator: "!=", Threshold: &threshold},
 	}, 45)
 	if err != nil || len(valid) != 3 {
 		t.Fatalf("expected three valid severity conditions, got %#v, %v", valid, err)
 	}
-	for _, condition := range valid {
-		if condition.ForSeconds != 45 {
-			t.Fatalf("expected shared rule duration, got %#v", valid)
-		}
-	}
+
 	if _, err := normalizeAlertRuleConditions([]saveAlertRuleConditionReq{
 		{Severity: "P1", Operator: ">", Threshold: &threshold},
 		{Severity: "P1", Operator: "<", Threshold: &threshold},

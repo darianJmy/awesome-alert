@@ -29,15 +29,16 @@ type mcpRequest struct {
 }
 
 type mcpTool struct {
-	Name        string                 `json:"name"`
-	Title       string                 `json:"title,omitempty"`
-	Description string                 `json:"description"`
-	InputSchema map[string]interface{} `json:"inputSchema"`
-	Annotations map[string]interface{} `json:"annotations,omitempty"`
-	Permission  string                 `json:"-"`
+	Name              string                 `json:"name"`
+	Title             string                 `json:"title,omitempty"`
+	Description       string                 `json:"description"`
+	InputSchema       map[string]interface{} `json:"inputSchema"`
+	Annotations       map[string]interface{} `json:"annotations,omitempty"`
+	Permission        string                 `json:"-"`
+	AssistantWritable bool                   `json:"-"`
 }
 
-var mcpTools = []mcpTool{
+var mcpTools = append(append(datasourceMCPTools(), platformMCPTools()...), []mcpTool{
 	{
 		Name: "query_alerts", Title: "查询告警", Permission: "alert:event:list",
 		Description: "查询故障中心的活跃或历史告警，可按状态、等级、来源和关键字筛选。",
@@ -96,7 +97,7 @@ var mcpTools = []mcpTool{
 		},
 		Annotations: map[string]interface{}{"readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": false},
 	},
-}
+}...)
 
 func GetMCPService(c *gin.Context) {
 	tools := make([]gin.H, 0, len(mcpTools))
@@ -196,7 +197,7 @@ func mcpInitialize(c *gin.Context, req mcpRequest, client models.MCPClient) {
 		"protocolVersion": protocol,
 		"capabilities":    gin.H{"tools": gin.H{"listChanged": false}},
 		"serverInfo":      gin.H{"name": mcpServerName, "title": "观澜运维平台 MCP 服务", "version": mcpServerVersion},
-		"instructions":    "使用平台工具查询告警、规则、拨测和自动化任务。执行自动化任务前必须确认任务 ID 与输入。",
+		"instructions":    "使用平台工具查询告警、规则、拨测、自动化任务和数据源；用户明确要求且参数齐全时可创建无认证直连数据源，也可测试已保存数据源连接。还可查询故障中心、各类分组、通知记录、证书和执行记录，并按权限创建故障中心、分组、通知模板和邮件通知对象。执行自动化任务前必须确认任务 ID 与输入。",
 	})
 }
 
@@ -228,7 +229,18 @@ func mcpCallTool(c *gin.Context, req mcpRequest) {
 		mcpWriteToolResult(c, req.ID, gin.H{"error": "没有调用该工具的权限"}, true)
 		return
 	}
-	result, err := executeMCPTool(tool.Name, params.Arguments)
+	var result interface{}
+	var err error
+	if isPlatformMCPTool(tool.Name) {
+		result, err = executePlatformMCPTool(c.Request.Context(), c.GetUint("user_id"), tool.Name, params.Arguments)
+	} else if isDatasourceMCPTool(tool.Name) {
+		result, err = executeDatasourceMCPTool(c.Request.Context(), c.GetUint("user_id"), tool.Name, params.Arguments)
+	} else {
+		result, err = executeMCPTool(tool.Name, params.Arguments)
+		if err == nil && tool.Annotations["readOnlyHint"] == true {
+			result, err = projectMCPQueryData(tool.Name, result)
+		}
+	}
 	if err != nil {
 		mcpWriteToolResult(c, req.ID, gin.H{"error": err.Error()}, true)
 		return

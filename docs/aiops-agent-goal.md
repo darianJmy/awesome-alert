@@ -21,39 +21,49 @@
 
    助手只能调用后端注册过的白名单工具，不能直接拼 SQL、执行任意命令或任意访问外部地址。工具需要有明确的参数、权限要求和风险等级。
 
-4. 写操作确认
+4. 写操作边界
 
-   创建、修改、删除、执行脚本、触发工作流等写操作必须先生成待确认计划，用户明确确认后才执行。
+   当前开放的低风险写工具包括创建故障中心、数据源分组、空告警/拨测规则组、通知模板、邮件通知对象，以及无认证直连 Prometheus/VictoriaMetrics 数据源。数据源创建时：用户明确提出创建、提供名称/类型/地址并说明无需认证，且通过后端权限与参数校验后执行。其他修改、删除、脚本、工作流等写操作需要服务端确认机制后再开放。
 
 5. 可解释输出
 
    助手需要返回它查询了什么、调用了什么工具、关键结果是什么，以及建议用户下一步怎么做。失败时必须说明失败原因和缺失参数。
 
-## 初始工具清单
+## 当前平台工具补充
 
-| 工具 | 用途 | 风险 | 状态 |
-| --- | --- | --- | --- |
-| `list_datasources` | 查询平台已有数据源 | 只读 | 目标能力 |
-| `create_datasource` | 新增数据源 | 写操作，需要确认 | 初始实现 |
-| `test_datasource` | 测试数据源连通性 | 只读 | 目标能力 |
-| `query_prometheus` | 执行 PromQL 查询 | 只读 | 初始实现 |
-| `get_system_overview` | 查询节点、CPU、内存、磁盘综合状况 | 只读 | 初始实现 |
-| `list_sls_logstores` | 查询阿里云 SLS 数据源下的日志集 | 只读 | 初始实现 |
-| `list_prometheus_metrics` | 查询指标名、标签、标签值 | 只读 | 目标能力 |
-| `run_inspection_item` | 执行巡检项 | 写操作，需要确认 | 目标能力 |
-| `list_recent_failures` | 查询最近失败记录 | 只读 | 目标能力 |
-| `remember_preference` | 记录用户明确要求保存的偏好 | 写操作，低风险 | 初始实现 |
-| `load_enabled_skills` | 加载启用的 Markdown Skill 知识 | 只读 | 初始实现 |
+可查询故障中心、数据源分组成员、告警/拨测规则组、通知对象与模板、通知发送记录、证书和域名到期状态、拨测记录、告警时间线和评估记录、自动化执行记录。
+可创建普通故障中心、带现有实例的数据源分组、空告警/拨测规则组、通知模板和邮件通知对象。邮件对象使用全局 SMTP，工具只保存收件人和模板，不发送消息。全部工具按用户权限注册并在执行时复查；没有实际工具时不得声称能完成操作。
+
+## 当前工具清单
+
+以当前用户实际收到的工具定义为准；权限不足时工具不会出现。
+
+| 工具 | 用途 |
+| --- | --- |
+| `query_prometheus_instant` | 当前分组内 Prometheus/VictoriaMetrics 即时查询 |
+| `query_datasources` / `test_datasource_connection` | 平台数据源查询及已保存连接测试 |
+| `create_datasource` | 创建无认证直连实例 |
+| `query_fault_centers` / `create_fault_center` | 查询、创建普通故障中心 |
+| `query_datasource_groups` / `create_datasource_group` | 查询分组成员、创建包含指定实例的分组 |
+| `query_alert_rule_groups` / `create_alert_rule_group` | 查询、创建空告警规则组 |
+| `query_probe_rule_groups` / `create_probe_rule_group` | 查询、创建空拨测规则组 |
+| `query_alerts` / `query_alert_rules` | 告警及规则查询 |
+| `query_alert_events` / `query_alert_evaluations` | 告警时间线及规则评估记录 |
+| `query_probe_tasks` / `query_probe_records` | 拨测任务及执行记录 |
+| `query_automation_tasks` / `query_automation_executions` | 自动化任务目录及执行状态（不执行任务） |
+| `query_notification_channels` / `query_notification_templates` / `query_notification_records` | 通知对象、模板及发送记录 |
+| `create_notification_template` / `create_email_notification_channel` | 创建模板和邮件对象（不发送消息） |
+| `query_certificates` / `query_certificate_domains` | 证书资产、域名状态和到期检查 |
+
+删除、修改运行策略、执行脚本及工作流尚未向内置助手开放。外部 MCP 中已有的自动化执行工具不属于内置助手工具集。
 
 ## 目标交互
 
 新增数据源：
 
 ```text
-用户：帮我新增一个 Prometheus 数据源，名字叫生产 prometheus，地址是 http://10.0.0.1:9090
-助手：我将创建 Prometheus 数据源：名称、地址、认证方式、状态。请确认是否创建。
-用户：确认
-助手：已创建，并给出连接测试结果。
+用户：帮我新增一个 Prometheus 数据源，名字叫生产 prometheus，地址是 http://10.0.0.1:9090，无需认证
+助手：调用创建工具，返回实际数据源 ID。只有另行执行连接测试后才报告连接结果。
 ```
 
 查询数据源：
@@ -65,7 +75,7 @@
 
 ## 安全边界
 
-- 写操作必须确认。
+- 仅已开放的低风险创建工具按用户明确请求执行，其他写操作须有服务端确认机制。
 - 敏感字段不在对话中明文回显。
 - 助手只调用平台内部工具函数。
 - 所有工具调用应记录在消息 metadata 中，便于审计和排查。
@@ -109,7 +119,7 @@ Skill 的 MVP 形态只作为知识注入 LLM 上下文，不执行任意代码�
 
 ## 工具使用方式
 - 只读工具可以直接查询
-- 写操作必须先确认
+- 非低风险写操作必须先确认
 
 ## 输出要求
 - 应该返回哪些关键信息
@@ -120,7 +130,7 @@ Skill 的 MVP 形态只作为知识注入 LLM 上下文，不执行任意代码�
 
 第一阶段先实现两个闭环：
 
-- 通过自然语言新增数据源，确认后落库并测试连接。
+- 通过自然语言明确请求创建无认证直连数据源，按权限落库；连接测试通过独立工具执行。
 - 通过自然语言指定 Prometheus 数据源查询系统概览，由 LLM 基于结构化查询结果总结。
 - 使用最近对话作为短期记忆，并将本目标文档作为平台知识注入 LLM 上下文。
 - 支持“记住默认 Prometheus 数据源是 xxx”这类明确偏好的长期记忆。

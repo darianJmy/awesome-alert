@@ -6,6 +6,7 @@ type FaultCenter struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	Name            string    `gorm:"size:128;not null;uniqueIndex" json:"name"`
 	Description     string    `gorm:"size:500" json:"description"`
+	IsDefault       bool      `gorm:"not null;default:false" json:"is_default"`
 	Status          int       `gorm:"not null;default:1;index" json:"status"`
 	TaskCount       int64     `gorm:"-" json:"task_count"`
 	PendingCount    int64     `gorm:"-" json:"pending_count"`

@@ -236,7 +236,7 @@ func alertRuleConfigRequest(groupID uint, entry alertRuleConfigEntry) saveAlertR
 	}
 	conditions := make([]saveAlertRuleConditionReq, 0, len(entry.Conditions))
 	for _, condition := range entry.Conditions {
-		conditions = append(conditions, saveAlertRuleConditionReq{Severity: condition.Severity, Operator: condition.Operator, Threshold: condition.Threshold, ForSeconds: entry.ForSeconds})
+		conditions = append(conditions, saveAlertRuleConditionReq{Severity: condition.Severity, Operator: condition.Operator, Threshold: condition.Threshold})
 	}
 	return saveAlertRuleReq{
 		GroupID: groupID, Name: entry.Name, Description: entry.Description, Expression: entry.Expression,
@@ -319,7 +319,7 @@ func updateImportedAlertRule(tx *gorm.DB, existing *models.AlertRule, rule model
 		"group_id": rule.GroupID, "name": rule.Name, "description": rule.Description, "expression": rule.Expression, "for_seconds": rule.ForSeconds,
 		"recovery_wait_seconds": rule.RecoveryWaitSeconds, "no_data_policy": "resolve", "evaluation_interval_seconds": rule.EvaluationIntervalSeconds,
 		"severity": rule.Severity, "labels": rule.Labels, "annotations": rule.Annotations, "fault_center_id": rule.FaultCenterID,
-		"datasource_group_id": 0, "datasource_mode": "combined", "status": rule.Status,
+		"status": rule.Status,
 	}
 	if err := tx.Model(existing).Updates(values).Error; err != nil {
 		return err

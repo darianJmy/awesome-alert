@@ -13,7 +13,6 @@ type SLSDashboardProject struct {
 	AccessKeySecretCipher string    `gorm:"type:text;not null" json:"-"`
 	Description           string    `gorm:"size:500" json:"description"`
 	Sort                  int       `gorm:"default:0;index" json:"sort"`
-	LegacyDatasourceID    *uint     `gorm:"uniqueIndex" json:"-"`
 	CreatedAt             time.Time `json:"created_at"`
 	UpdatedAt             time.Time `json:"updated_at"`
 }

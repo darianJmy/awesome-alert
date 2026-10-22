@@ -144,14 +144,14 @@ func buildRepositoryArtifact(repository models.GitRepository, ref string) (repos
 }
 
 func configureGitCredential(root string, repository models.GitRepository, command *exec.Cmd) error {
-	credentialType, credentialUser, credentialCipher := repository.CredentialType, repository.CredentialUser, repository.CredentialCipher
-	if repository.CredentialID > 0 {
-		var credential models.GitCredential
-		if database.DB.First(&credential, repository.CredentialID).Error != nil || credential.Status != 1 {
-			return errors.New("Git 认证不存在或已停用")
-		}
-		credentialType, credentialUser, credentialCipher = credential.AuthType, credential.Username, credential.SecretCipher
+	if repository.CredentialID == 0 {
+		return nil
 	}
+	var credential models.GitCredential
+	if database.DB.First(&credential, repository.CredentialID).Error != nil || credential.Status != 1 {
+		return errors.New("Git 认证不存在或已停用")
+	}
+	credentialType, credentialUser, credentialCipher := credential.AuthType, credential.Username, credential.SecretCipher
 	if credentialType == "none" || credentialType == "" {
 		return nil
 	}

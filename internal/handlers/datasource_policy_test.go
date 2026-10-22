@@ -174,9 +174,6 @@ func testSupportedMonitoringAPI(t *testing.T, kind string) {
 	if prom.Status != 1 {
 		t.Fatal("mixed batch partially modified Prometheus")
 	}
-	if menu := monitoringMenu(models.Menu{Path: "/integrations/sources", Name: "监控接入"}); menu.Name != "接入中心" {
-		t.Fatal("old menu not renamed")
-	}
 	catalog := collectDatasourceCatalog(0)
 	if strings.Contains(catalog, "legacy mysql") || strings.Contains(catalog, "disabled") || !strings.Contains(catalog, "prod updated") || strings.Contains(catalog, "secret") {
 		t.Fatalf("invalid AI catalog: %s", catalog)

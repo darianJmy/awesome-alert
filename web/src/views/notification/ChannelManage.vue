@@ -86,10 +86,10 @@
             </button>
           </div>
         </el-form-item>
-        <el-form-item prop="webhook_url">
+        <el-form-item v-if="form.type !== 'email'" prop="webhook_url">
           <template #label>
             <span class="form-label">
-              默认Hook
+              Webhook 地址
               <el-tooltip :content="webhookHelpText" placement="top">
                 <el-icon class="help-icon"><QuestionFilled /></el-icon>
               </el-tooltip>
@@ -97,7 +97,7 @@
           </template>
           <el-input v-model="form.webhook_url" :placeholder="webhookPlaceholder" @focus="selectInputText" />
         </el-form-item>
-        <el-form-item prop="sign_secret">
+        <el-form-item v-if="['feishu', 'dingding'].includes(form.type)" prop="sign_secret">
           <template #label>
             <span class="form-label">
               签名密钥
@@ -113,6 +113,9 @@
             :placeholder="secretPlaceholder"
             @focus="selectInputText"
           />
+        </el-form-item>
+        <el-form-item v-if="form.type === 'email'" label="收件人邮箱" prop="email_recipients">
+          <el-select v-model="form.email_recipients" multiple filterable allow-create default-first-option :reserve-keyword="false" placeholder="输入邮箱后按回车，可添加多个" />
         </el-form-item>
         <el-form-item prop="template_id">
           <template #label>
@@ -155,6 +158,7 @@ import { ArrowLeft, Delete, Edit, Plus, Promotion, QuestionFilled, Refresh, Sear
 import feishuIcon from '../../assets/feishu.svg'
 import emailIcon from '../../assets/email.svg'
 import dingdingIcon from '../../assets/dingding.svg'
+import qywechatIcon from '../../assets/qywechat.svg'
 import {
   createNotificationChannel,
   deleteNotificationChannel,
@@ -185,17 +189,8 @@ const notificationTypes = [
     icon: feishuIcon,
     webhookPlaceholder: 'https://open.feishu.cn/open-apis/bot/v2/hook/...',
     webhookHint: '飞书机器人 Webhook 地址',
-    secretPlaceholder: '飞书机器人签名密钥',
-    secretHint: '飞书机器人安全设置里的签名密钥',
-  },
-  {
-    value: 'email',
-    label: '邮件',
-    icon: emailIcon,
-    webhookPlaceholder: 'https://example.com/email-webhook',
-    webhookHint: '邮件通知接收服务的 Webhook 地址',
-    secretPlaceholder: '可选',
-    secretHint: '当前类型暂不强制使用签名密钥',
+    secretPlaceholder: '启用签名校验时填写',
+    secretHint: '机器人启用签名校验时，填写对应签名密钥；未启用可留空',
   },
   {
     value: 'dingding',
@@ -203,12 +198,26 @@ const notificationTypes = [
     icon: dingdingIcon,
     webhookPlaceholder: 'https://oapi.dingtalk.com/robot/send?access_token=...',
     webhookHint: '钉钉机器人 Webhook 地址',
-    secretPlaceholder: '可选',
-    secretHint: '当前类型暂不强制使用签名密钥',
+    secretPlaceholder: '启用加签时填写 SEC 开头的密钥',
+    secretHint: '机器人选择加签时需填写密钥；使用关键词或 IP 白名单时可留空，并确保消息和服务器符合机器人安全设置',
+  },
+  {
+    value: 'qywechat',
+    label: '企业微信',
+    icon: qywechatIcon,
+    webhookPlaceholder: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...',
+    webhookHint: '企业微信群机器人的完整 Webhook 地址（包含 key）',
+  },
+  {
+    value: 'email',
+    label: '邮件',
+    icon: emailIcon,
+
   },
 ]
 
 const form = reactive({
+  email_recipients: [],
   id: null,
   name: '',
   type: 'feishu',
@@ -247,7 +256,7 @@ const secretHelpText = computed(() => {
 })
 
 const validateWebhook = (_rule, value, callback) => {
-  if (form.id && !String(value || '').trim()) {
+  if (form.type === 'email' || (form.id && !String(value || '').trim())) {
     callback()
     return
   }
@@ -255,7 +264,7 @@ const validateWebhook = (_rule, value, callback) => {
     callback()
     return
   }
-  callback(new Error('请输入默认Hook'))
+  callback(new Error('请输入 Webhook 地址'))
 }
 
 const validateSignSecret = (_rule, value, callback) => {
@@ -263,6 +272,7 @@ const validateSignSecret = (_rule, value, callback) => {
 }
 
 const rules = {
+  email_recipients: [{ validator: (_r, value, done) => Array.isArray(value) && value.length && value.every(address => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) ? done() : done(new Error('请添加有效的收件人邮箱')), trigger: 'change' }],
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   webhook_url: [{ required: true, validator: validateWebhook, trigger: 'blur' }],
   sign_secret: [{ validator: validateSignSecret, trigger: 'blur' }],
@@ -297,6 +307,7 @@ async function loadTemplates() {
 
 function openDrawer(row) {
   Object.assign(form, row ? {
+    email_recipients: [...(row.email_recipients || [])],
     id: row.id,
     name: row.name,
     type: row.type || 'feishu',
@@ -305,6 +316,7 @@ function openDrawer(row) {
     sign_secret: row.sign_secret || '',
     description: row.description || '',
   } : {
+    email_recipients: [],
     id: null,
     name: '',
     type: 'feishu',
@@ -321,6 +333,7 @@ function selectType(type) {
   if (form.type === type) return
   form.type = type
   form.template_id = null
+  formRef.value?.clearValidate()
 }
 
 async function save() {
@@ -332,8 +345,9 @@ async function save() {
       name: form.name,
       type: form.type,
       template_id: form.template_id,
-      webhook_url: normalizedWebhookURL(),
-      sign_secret: normalizedSignSecret(),
+      webhook_url: form.type === 'email' ? '' : normalizedWebhookURL(),
+      sign_secret: ['feishu', 'dingding'].includes(form.type) ? normalizedSignSecret() : '',
+      email_recipients: form.type === 'email' ? form.email_recipients : undefined,
       status: 1,
       description: form.description,
     }
@@ -551,8 +565,8 @@ function formatTime(value) {
 }
 
 .type-card-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   width: 100%;
 }
@@ -562,7 +576,8 @@ function formatTime(value) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100px;
+  width: 100%;
+  min-width: 0;
   height: 100px;
   padding: 0;
   cursor: pointer;
@@ -646,4 +661,5 @@ function formatTime(value) {
 
 @media (max-width: 980px) { .task-toolbar { align-items: stretch; flex-wrap: wrap; }.filter-bar { width: 100%; flex: 1 1 100%; }.page-header-actions { margin-left: auto; }.task-pagination { overflow-x: auto; justify-content: flex-start; } }
 @media (max-width: 620px) { .task-toolbar { flex-direction: column; }.filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }.task-search { grid-column: 1 / -1; }.page-header-actions { justify-content: flex-end; } }
+@media (max-width: 400px) { .type-card-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

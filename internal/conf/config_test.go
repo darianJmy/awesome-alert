@@ -10,11 +10,9 @@ func isolate(t *testing.T) {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	for _, binding := range bindings {
-		for _, name := range binding.names {
-			t.Setenv(name, "")
-			if err := os.Unsetenv(name); err != nil {
-				t.Fatal(err)
-			}
+		t.Setenv(binding.name, "")
+		if err := os.Unsetenv(binding.name); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
@@ -61,8 +59,7 @@ func TestExplicitConfigAndEnvironmentPrecedence(t *testing.T) {
 		t.Fatalf("explicit config not loaded: %+v", cfg)
 	}
 	writeConfig(t, ".env", "APP_SERVER_ADDR=:9002\nAPP_AI_MODEL=dotenv-model\nAPP_DATABASE_DSN=dotenv-dsn\n")
-	t.Setenv("SERVER_PORT", ":9003")
-	t.Setenv("DB_DSN", "legacy-dsn")
+	t.Setenv("APP_SERVER_ADDR", ":9003")
 	t.Setenv("APP_DATABASE_DSN", "prefixed-dsn")
 	t.Setenv("APP_AI_API_KEY", "")
 	cfg, err = InitConfig(path)
@@ -77,20 +74,14 @@ func TestExplicitConfigAndEnvironmentPrecedence(t *testing.T) {
 	}
 }
 
-func TestLegacyEnvironmentBindings(t *testing.T) {
+func TestOldEnvironmentNamesAreIgnored(t *testing.T) {
 	isolate(t)
-	t.Setenv("SERVER_PORT", "127.0.0.1:9090")
-	t.Setenv("JWT_SECRET", "legacy-secret")
-	t.Setenv("DB_DSN", "legacy-dsn")
-	t.Setenv("ANTHROPIC_BASE_URL", "https://legacy.example.com")
-	t.Setenv("ANTHROPIC_API_KEY", "legacy-key")
-	t.Setenv("ANTHROPIC_MODEL", "legacy-model")
+	t.Setenv("SERVER_PORT", ":9009")
+	t.Setenv("JWT_SECRET", "old-secret")
+	t.Setenv("DB_DSN", "old-database")
 	cfg, err := InitConfig("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg != (Config{Log: DefaultConfig().Log, ServerPort: "127.0.0.1:9090", JWTSecret: "legacy-secret", DBDSN: "legacy-dsn"}) {
-		t.Fatalf("legacy binding failed: %+v", cfg)
+	if err != nil || cfg != DefaultConfig() {
+		t.Fatal("old environment names must not affect current configuration")
 	}
 }
 
@@ -148,5 +139,29 @@ func TestLegacyAIConfigIsIgnored(t *testing.T) {
 	t.Setenv("APP_AI_PROVIDER", "unsupported")
 	if _, err := InitConfig(""); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSMTPConfigurationPrecedence(t *testing.T) {
+	isolate(t)
+	writeConfig(t, "conf/config.yaml", "smtp:\n  host: smtp.example.com\n  port: 587\n  security: starttls\n  username: alerts@example.com\n  password: file-password\n  from: alerts@example.com\n")
+	cfg, err := InitConfig("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SMTP.Host != "smtp.example.com" || cfg.SMTP.Port != 587 || cfg.SMTP.Security != "starttls" || cfg.SMTP.Password != "file-password" || cfg.SMTP.Username != "alerts@example.com" || cfg.SMTP.From != "alerts@example.com" {
+		t.Fatal("SMTP YAML not loaded")
+	}
+	writeConfig(t, ".env", "APP_SMTP_PASSWORD=dotenv-password\n")
+	cfg, err = InitConfig("")
+	if err != nil || cfg.SMTP.Password != "dotenv-password" {
+		t.Fatal("SMTP dotenv override failed")
+	}
+	t.Setenv("APP_SMTP_PASSWORD", "environment-password")
+	t.Setenv("APP_SMTP_PORT", "465")
+	t.Setenv("APP_SMTP_SECURITY", "tls")
+	cfg, err = InitConfig("")
+	if err != nil || cfg.SMTP.Password != "environment-password" || cfg.SMTP.Port != 465 || cfg.SMTP.Security != "tls" {
+		t.Fatal("SMTP environment override failed")
 	}
 }

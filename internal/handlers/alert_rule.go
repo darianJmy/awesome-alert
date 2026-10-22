@@ -49,18 +49,15 @@ type saveAlertRuleReq struct {
 	Severity                  string                      `json:"severity"`
 	ExternalLabels            map[string]string           `json:"external_labels"`
 	Annotations               map[string]string           `json:"annotations"`
-	DatasourceGroupID         uint                        `json:"datasource_group_id"`
 	DatasourceGroupIDs        []uint                      `json:"datasource_group_ids"`
-	DatasourceMode            string                      `json:"datasource_mode"`
 	Status                    int                         `json:"status"`
 	Conditions                []saveAlertRuleConditionReq `json:"conditions"`
 }
 
 type saveAlertRuleConditionReq struct {
-	Severity   string   `json:"severity"`
-	Operator   string   `json:"operator"`
-	Threshold  *float64 `json:"threshold"`
-	ForSeconds int      `json:"for_seconds"`
+	Severity  string   `json:"severity"`
+	Operator  string   `json:"operator"`
+	Threshold *float64 `json:"threshold"`
 }
 
 type alertRuleSelection struct {
@@ -215,7 +212,7 @@ func UpdateAlertRule(c *gin.Context) {
 			"group_id": rule.GroupID, "name": rule.Name, "description": rule.Description, "expression": rule.Expression, "for_seconds": rule.ForSeconds,
 			"recovery_wait_seconds": rule.RecoveryWaitSeconds, "no_data_policy": "resolve", "evaluation_interval_seconds": rule.EvaluationIntervalSeconds,
 			"severity": rule.Severity, "labels": rule.Labels, "annotations": rule.Annotations,
-			"fault_center_id": rule.FaultCenterID, "datasource_group_id": rule.DatasourceGroupID, "datasource_mode": rule.DatasourceMode, "status": rule.Status,
+			"fault_center_id": rule.FaultCenterID, "status": rule.Status,
 		}
 		if err := tx.Model(&existing).Updates(values).Error; err != nil {
 			return err
@@ -499,9 +496,6 @@ func buildAlertRule(req saveAlertRuleReq, excludeID uint) (models.AlertRule, ale
 		return models.AlertRule{}, emptySelection, fmt.Errorf("请选择启用的故障中心")
 	}
 	datasourceGroupIDs := append([]uint{}, req.DatasourceGroupIDs...)
-	if req.DatasourceGroupID > 0 {
-		datasourceGroupIDs = append(datasourceGroupIDs, req.DatasourceGroupID)
-	}
 	datasourceGroupIDs = normalizeChannelIDs(datasourceGroupIDs)
 	directDatasourceIDs := normalizeChannelIDs(req.DatasourceIDs)
 	effectiveIDs, err := datasourceIDsForSelection(database.DB, datasourceGroupIDs, directDatasourceIDs)
@@ -522,7 +516,7 @@ func buildAlertRule(req saveAlertRuleReq, excludeID uint) (models.AlertRule, ale
 	if err != nil {
 		return models.AlertRule{}, emptySelection, err
 	}
-	severity, req.ForSeconds = conditions[0].Severity, conditions[0].ForSeconds
+	severity = conditions[0].Severity
 	labels, err := normalizeRuleTextMap(req.ExternalLabels, 30)
 	if err != nil {
 		return models.AlertRule{}, emptySelection, err
@@ -535,7 +529,7 @@ func buildAlertRule(req saveAlertRuleReq, excludeID uint) (models.AlertRule, ale
 	encodedLabels, _ := json.Marshal(labels)
 	encodedAnnotations, _ := json.Marshal(annotations)
 	selection := alertRuleSelection{DirectDatasourceIDs: directDatasourceIDs, DatasourceGroupIDs: datasourceGroupIDs, EffectiveIDs: effectiveIDs, Conditions: conditions}
-	return models.AlertRule{GroupID: req.GroupID, Name: req.Name, Description: req.Description, Expression: req.Expression, ForSeconds: req.ForSeconds, RecoveryWaitSeconds: req.RecoveryWaitSeconds, NoDataPolicy: "resolve", EvaluationIntervalSeconds: req.EvaluationIntervalSeconds, Severity: severity, Labels: string(encodedLabels), Annotations: string(encodedAnnotations), FaultCenterID: req.FaultCenterID, DatasourceGroupID: 0, DatasourceMode: "combined", Status: req.Status}, selection, nil
+	return models.AlertRule{GroupID: req.GroupID, Name: req.Name, Description: req.Description, Expression: req.Expression, ForSeconds: req.ForSeconds, RecoveryWaitSeconds: req.RecoveryWaitSeconds, NoDataPolicy: "resolve", EvaluationIntervalSeconds: req.EvaluationIntervalSeconds, Severity: severity, Labels: string(encodedLabels), Annotations: string(encodedAnnotations), FaultCenterID: req.FaultCenterID, Status: req.Status}, selection, nil
 }
 
 func validateAlertRuleTiming(evaluationInterval, forSeconds, recoverySeconds int) error {
@@ -614,7 +608,7 @@ func normalizeAlertRuleConditions(values []saveAlertRuleConditionReq, forSeconds
 		if item.Threshold != nil {
 			threshold = *item.Threshold
 		}
-		conditions = append(conditions, models.AlertRuleCondition{Severity: severity, Operator: operator, Threshold: threshold, ForSeconds: forSeconds, Sort: index})
+		conditions = append(conditions, models.AlertRuleCondition{Severity: severity, Operator: operator, Threshold: threshold, Sort: index})
 	}
 	return conditions, nil
 }
@@ -842,7 +836,7 @@ func alertRuleResponse(rule models.AlertRule) gin.H {
 	database.DB.Model(&models.AlertInstance{}).Where("source = ? AND source_id = ? AND status IN ?", alertRuleSource, rule.ID, []string{alertStatusPending, alertStatusFiring, alertStatusRecovering}).Count(&activeCount)
 	var conditions []models.AlertRuleCondition
 	database.DB.Where("rule_id = ?", rule.ID).Order("sort ASC, id ASC").Find(&conditions)
-	return gin.H{"id": rule.ID, "group_id": rule.GroupID, "group_name": group.Name, "name": rule.Name, "description": rule.Description, "expression": rule.Expression, "datasource_group_ids": datasourceGroupIDs, "datasource_group_names": datasourceGroupNames, "direct_datasource_ids": directDatasourceIDs, "datasource_ids": datasourceIDs, "datasource_names": datasourceNames, "datasource_results": datasourceResults, "fault_center_id": rule.FaultCenterID, "fault_center_name": center.Name, "datasource_mode": rule.DatasourceMode, "for_seconds": rule.ForSeconds, "recovery_wait_seconds": rule.RecoveryWaitSeconds, "no_data_policy": "resolve", "evaluation_interval_seconds": rule.EvaluationIntervalSeconds, "severity": rule.Severity, "conditions": conditions, "external_labels": decodeAlertRuleExternalLabels(rule.Labels), "annotations": decodeAlertRuleAnnotations(rule.Annotations), "status": rule.Status, "last_evaluated_at": lastEvaluatedAt, "last_status": aggregateStatus, "last_error": aggregateError, "active_count": activeCount, "created_at": rule.CreatedAt, "updated_at": rule.UpdatedAt}
+	return gin.H{"id": rule.ID, "group_id": rule.GroupID, "group_name": group.Name, "name": rule.Name, "description": rule.Description, "expression": rule.Expression, "datasource_group_ids": datasourceGroupIDs, "datasource_group_names": datasourceGroupNames, "direct_datasource_ids": directDatasourceIDs, "datasource_ids": datasourceIDs, "datasource_names": datasourceNames, "datasource_results": datasourceResults, "fault_center_id": rule.FaultCenterID, "fault_center_name": center.Name, "for_seconds": rule.ForSeconds, "recovery_wait_seconds": rule.RecoveryWaitSeconds, "no_data_policy": "resolve", "evaluation_interval_seconds": rule.EvaluationIntervalSeconds, "severity": rule.Severity, "conditions": conditions, "external_labels": decodeAlertRuleExternalLabels(rule.Labels), "annotations": decodeAlertRuleAnnotations(rule.Annotations), "status": rule.Status, "last_evaluated_at": lastEvaluatedAt, "last_status": aggregateStatus, "last_error": aggregateError, "active_count": activeCount, "created_at": rule.CreatedAt, "updated_at": rule.UpdatedAt}
 }
 
 func decodeRuleTextMap(value string) map[string]string {

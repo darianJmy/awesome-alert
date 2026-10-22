@@ -49,7 +49,7 @@ func authorizeAIPermission(ctx context.Context, userID uint, permission string) 
 func aiToolPolicy(userID uint) func(context.Context, aicore.ToolSpec, aicore.ToolCall) error {
 	return func(ctx context.Context, spec aicore.ToolSpec, _ aicore.ToolCall) error {
 		if tool, ok := findMCPTool(spec.Name); ok {
-			if tool.Annotations["readOnlyHint"] != true {
+			if tool.Annotations["readOnlyHint"] != true && !tool.AssistantWritable {
 				return fmt.Errorf("助手不支持写操作")
 			}
 			return authorizeAIPermission(ctx, userID, tool.Permission)

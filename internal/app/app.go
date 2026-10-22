@@ -7,7 +7,6 @@ import (
 	"guanlan/internal/handlers"
 	"guanlan/internal/routes"
 	"guanlan/pkg/logger"
-	webassets "guanlan/web"
 	"io/fs"
 	"log/slog"
 
@@ -25,10 +24,10 @@ func newApplication(cfg config.Config, router *gin.Engine) *App {
 	return &App{config: cfg, router: router}
 }
 
-// The database dependency ensures legacy handlers have a validated connection
+// The database dependency ensures handlers have a validated connection
 // before the router is made available.
 func newRouter(_ *gorm.DB, assets fs.FS) (*gin.Engine, error) {
-	webFiles, err := fs.Sub(assets, "dist")
+	webFiles, err := fs.Sub(assets, "web/dist")
 	if err != nil {
 		return nil, fmt.Errorf("load embedded web files: %w", err)
 	}
@@ -55,5 +54,3 @@ func newDatabase(cfg config.Config, _ *slog.Logger) (*gorm.DB, func(), error) {
 }
 
 func newLogger(cfg config.Config) (*slog.Logger, func(), error) { return logger.New(cfg.Log) }
-
-func embeddedAssets() fs.FS { return webassets.Files }

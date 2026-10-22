@@ -40,22 +40,10 @@ attributes:
 	}
 }
 
-func TestBuildAuthSettingStillAcceptsFlatLDAPYAML(t *testing.T) {
-	item, err := buildAuthSettingForTest(saveAuthSettingReq{
-		LDAPEnabled: true,
-		LDAPConfig: `url: ldap://ldap.example.com:389
-base_dn: dc=example,dc=com
-user_filter: (uid={username})
-username_attribute: uid
-display_name_attribute: cn
-email_attribute: mail
-`,
-	}, models.AuthSetting{})
-	if err != nil {
-		t.Fatalf("expected legacy flat LDAP YAML to remain valid, got %v", err)
-	}
-	if item.LDAPURL != "ldap://ldap.example.com:389" {
-		t.Fatalf("legacy LDAP YAML was not applied: %#v", item)
+func TestBuildAuthSettingRejectsFlatLDAPYAML(t *testing.T) {
+	_, err := buildAuthSettingForTest(saveAuthSettingReq{LDAPEnabled: true, LDAPConfig: "url: ldaps://ldap.example.com:636\nbase_dn: dc=example,dc=com"}, models.AuthSetting{})
+	if err == nil {
+		t.Fatal("flat LDAP YAML must be rejected; use the nested configuration schema")
 	}
 }
 

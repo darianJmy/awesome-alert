@@ -45,7 +45,7 @@ func TestAssistantMCPPermissionsAndProjection(t *testing.T) {
 	}
 	registry := aicore.NewRegistry()
 	registerAssistantMCPTools(context.Background(), registry, 1)
-	if len(registry.Specs()) != 1 {
+	if len(registry.Specs()) != 2 {
 		t.Fatalf("wrong tools: %+v", registry.Specs())
 	}
 	if _, ok := registry.Get("run_automation_task"); ok {
@@ -67,7 +67,7 @@ func TestAssistantMCPPermissionsAndProjection(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rounds++
 		var request struct {
-			Messages []anthropicMessage `json:"messages"`
+			Messages []mockChatMessage `json:"messages"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Error(err)
@@ -84,7 +84,7 @@ func TestAssistantMCPPermissionsAndProjection(t *testing.T) {
 		if request.Messages[len(request.Messages)-1].Role != "tool" {
 			t.Error("native tool response missing")
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{"choices": []interface{}{map[string]interface{}{"message": anthropicMessage{Role: "assistant", Content: "找到任务 demo"}, "finish_reason": "stop"}}})
+		json.NewEncoder(w).Encode(map[string]interface{}{"choices": []interface{}{map[string]interface{}{"message": mockChatMessage{Role: "assistant", Content: "找到任务 demo"}, "finish_reason": "stop"}}})
 
 	}))
 	defer server.Close()
@@ -101,4 +101,9 @@ func TestAssistantMCPPermissionsAndProjection(t *testing.T) {
 	if err := aiToolPolicy(1)(context.Background(), tool.Spec, aicore.ToolCall{}); err == nil {
 		t.Fatal("permission revocation ignored")
 	}
+}
+
+type mockChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }

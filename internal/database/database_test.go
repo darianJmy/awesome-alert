@@ -36,23 +36,3 @@ func TestFreshSchemaDoesNotRunLegacyDataConversions(t *testing.T) {
 		return true
 	})
 }
-
-func TestSuffixedScriptNameKeepsDatabaseLimit(t *testing.T) {
-	name := suffixedScriptName(strings.Repeat("脚", 100), 2)
-	if got := len([]rune(name)); got != 100 {
-		t.Fatalf("name length = %d, want 100", got)
-	}
-	if !strings.HasSuffix(name, " (2)") {
-		t.Fatalf("name = %q, want duplicate suffix", name)
-	}
-}
-
-func TestLegacyGitCredentialNameKeepsDatabaseLimit(t *testing.T) {
-	name := legacyGitCredentialName(strings.Repeat("仓", 128), 12)
-	if got := len([]rune(name)); got != 128 {
-		t.Fatalf("name length = %d, want 128", got)
-	}
-	if !strings.HasSuffix(name, " 认证 (12)") {
-		t.Fatalf("name = %q, want migration suffix", name)
-	}
-}

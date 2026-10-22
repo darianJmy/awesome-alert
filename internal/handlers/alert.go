@@ -136,6 +136,23 @@ func UpdateFaultCenter(c *gin.Context) {
 
 func DeleteFaultCenter(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
+	var center models.FaultCenter
+	if id < 1 {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "故障中心不存在"})
+		return
+	}
+	if err := database.DB.First(&center, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "故障中心不存在"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "查询故障中心失败"})
+		}
+		return
+	}
+	if center.IsDefault {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "默认故障中心不能删除"})
+		return
+	}
 	var taskCount, alertCount, certificateDomainCount int64
 	database.DB.Model(&models.InspectionItem{}).Where("fault_center_id = ?", id).Count(&taskCount)
 	database.DB.Model(&models.AlertInstance{}).Where("fault_center_id = ?", id).Count(&alertCount)

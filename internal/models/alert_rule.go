@@ -24,8 +24,6 @@ type AlertRule struct {
 	Labels                    string     `gorm:"type:text" json:"-"`
 	Annotations               string     `gorm:"type:text" json:"-"`
 	FaultCenterID             uint       `gorm:"not null;index" json:"fault_center_id"`
-	DatasourceGroupID         uint       `gorm:"not null;default:0;index" json:"datasource_group_id"`
-	DatasourceMode            string     `gorm:"size:20;not null;default:custom;index" json:"datasource_mode"`
 	Status                    int        `gorm:"not null;default:1;index" json:"status"`
 	LastEvaluatedAt           *time.Time `gorm:"index" json:"last_evaluated_at"`
 	LastStatus                string     `gorm:"size:20" json:"last_status"`
@@ -66,18 +64,16 @@ type AlertRuleDatasourceGroup struct {
 }
 
 // AlertRuleCondition defines one severity threshold branch for a rule's
-// PromQL result. ForSeconds is retained for schema compatibility; runtime
-// evaluation uses the parent rule's shared duration.
+// PromQL result. Evaluation uses the parent rule's shared duration.
 type AlertRuleCondition struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	RuleID     uint      `gorm:"not null;index" json:"rule_id"`
-	Severity   string    `gorm:"size:20;not null" json:"severity"`
-	Operator   string    `gorm:"size:16;not null" json:"operator"`
-	Threshold  float64   `gorm:"not null;default:0" json:"threshold"`
-	ForSeconds int       `gorm:"not null;default:0" json:"for_seconds"`
-	Sort       int       `gorm:"not null;default:0" json:"sort"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	RuleID    uint      `gorm:"not null;index" json:"rule_id"`
+	Severity  string    `gorm:"size:20;not null" json:"severity"`
+	Operator  string    `gorm:"size:16;not null" json:"operator"`
+	Threshold float64   `gorm:"not null;default:0" json:"threshold"`
+	Sort      int       `gorm:"not null;default:0" json:"sort"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type AlertEvaluationRecord struct {

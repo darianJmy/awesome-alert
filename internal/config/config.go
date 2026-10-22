@@ -1,4 +1,4 @@
-// Package config provides compatibility for handlers using the shared configuration.
+// Package config loads command-line configuration and publishes the application settings.
 package config
 
 import (
