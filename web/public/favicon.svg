@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="beacon" x1="10" y1="16" x2="49" y2="53" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0BAFD4"/>
+      <stop offset=".48" stop-color="#3979F4"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#beacon)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m23 18 9-8 9 8H23Z"/>
+    <path d="M26 19v10h12V19M26 29l-4 15m16-15 4 15"/>
+    <path d="m25 35 14 4"/>
+    <path d="m10 20 7 3m-7 9 7-3m30-6 7-3m-7 9 7 3"/>
+    <path d="M8 50c6-7 12-7 18-1s12 6 18 0c4-4 8-5 12-2"/>
+  </g>
+</svg>

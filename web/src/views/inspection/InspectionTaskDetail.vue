@@ -11,12 +11,12 @@
 
     <main class="chart-grid">
       <section class="chart-card">
-        <div class="card-heading"><div><strong>可用率趋势</strong><span>按时间窗口统计成功请求占比</span></div><span class="range-note">{{ currentRangeLabel }}</span></div>
+        <div class="card-heading"><div><strong>可用率趋势</strong><span>按时间窗口统计拨测成功占比</span></div><span class="range-note">{{ currentRangeLabel }}</span></div>
         <div class="chart-shell"><v-chart v-if="hasTrendData" class="chart" :option="availabilityOption" autoresize /><el-empty v-else :image-size="72" description="当前时间范围内暂无拨测数据" /></div>
       </section>
 
       <section class="chart-card">
-        <div class="card-heading"><div><strong>请求耗时趋势</strong><span>每次拨测的端到端执行耗时</span></div><span class="range-note">毫秒</span></div>
+        <div class="card-heading"><div><strong>执行耗时趋势</strong><span>每次拨测的端到端执行耗时</span></div><span class="range-note">毫秒</span></div>
         <div class="chart-shell"><v-chart v-if="hasTrendData" class="chart" :option="durationOption" autoresize /><el-empty v-else :image-size="72" description="当前时间范围内暂无耗时数据" /></div>
       </section>
 
@@ -35,9 +35,10 @@
         <div v-show="recordsExpanded" id="recent-probe-table">
           <el-table :data="recentPoints" stripe>
             <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">{{ row.status === 'success' ? '正常' : '失败' }}</el-tag></template></el-table-column>
+            <el-table-column v-if="item.type === 'script'" label="退出码" width="90"><template #default="{ row }">{{ parseObject(row.result).exit_code ?? '—' }}</template></el-table-column>
             <el-table-column v-if="isHTTP" label="HTTP 状态码" width="130"><template #default="{ row }"><span :class="`status-code code-text-${statusGroup(recordStatusCode(row))}`">{{ recordStatusCode(row) || '—' }}</span></template></el-table-column>
             <el-table-column label="请求耗时" width="130"><template #default="{ row }"><el-tag class="duration-tag" type="info" effect="plain" size="small">{{ row.duration_ms }} ms</el-tag></template></el-table-column>
-            <el-table-column label="结果详情" min-width="360"><template #default="{ row }"><CertificateExpiryResult v-if="item.type === 'certificate_expiry'" :result="row.result" /><code v-else class="record-result">{{ formatResult(row.result) }}</code></template></el-table-column>
+            <el-table-column label="结果详情" min-width="360"><template #default="{ row }"><CertificateExpiryResult v-if="item.type === 'certificate_expiry'" :result="row.result" /><ScriptProbeResult v-else-if="item.type === 'script'" :result="row.result" /><code v-else class="record-result">{{ formatResult(row.result) }}</code></template></el-table-column>
             <el-table-column label="执行时间" min-width="180"><template #default="{ row }">{{ formatTime(row.created_at) }}</template></el-table-column>
             <template #empty><TableEmpty /></template>
           </el-table>
@@ -56,6 +57,7 @@ import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import ScriptProbeResult from '../../components/ScriptProbeResult.vue'
 import CertificateExpiryResult from '../../components/CertificateExpiryResult.vue'
 import { getInspectionItemOverview, getInspectionRecords } from '../../api/inspection'
 

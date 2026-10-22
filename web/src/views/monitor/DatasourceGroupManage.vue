@@ -37,9 +37,9 @@
       </div>
     </section>
 
-    <el-drawer v-model="drawerVisible" class="datasource-group-drawer" size="min(560px, 94vw)" :close-on-click-modal="false" destroy-on-close>
+    <el-drawer v-model="drawerVisible" class="datasource-group-drawer" size="min(460px, 94vw)" :close-on-click-modal="false" destroy-on-close>
       <template #header>
-        <div class="drawer-header"><el-button text :icon="ArrowLeft" @click="drawerVisible = false">返回</el-button><strong>{{ form.id ? '编辑数据源分组' : '新增数据源分组' }}</strong></div>
+        <div class="drawer-header"><DrawerBackButton @click="drawerVisible = false" /><strong>{{ form.id ? '编辑数据源分组' : '新增数据源分组' }}</strong></div>
       </template>
       <el-form ref="formRef" :model="form" :rules="formRules" label-position="top">
         <el-form-item label="分组名称" prop="name"><el-input v-model="form.name" maxlength="128" show-word-limit /></el-form-item>
@@ -56,6 +56,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'

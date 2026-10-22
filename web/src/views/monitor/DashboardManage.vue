@@ -93,10 +93,10 @@
     </template>
 
     <!-- 新增/编辑抽屉 -->
-    <el-drawer v-model="drawerVisible" class="dashboard-drawer" size="480px" direction="rtl" :show-close="false" :close-on-click-modal="false" destroy-on-close>
+    <el-drawer v-model="drawerVisible" class="dashboard-drawer" size="min(460px, 94vw)" direction="rtl" :show-close="false" :close-on-click-modal="false" destroy-on-close>
       <template #header>
         <div class="drawer-header">
-          <el-button text :icon="ArrowLeft" class="drawer-back" @click="drawerVisible = false">返回</el-button>
+          <DrawerBackButton @click="drawerVisible = false" />
           <span class="drawer-title">{{ isEdit ? `编辑${dashboardConfig.shortName}` : `创建${dashboardConfig.shortName}` }}</span>
         </div>
       </template>
@@ -142,6 +142,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import PageEmpty from '../../components/PageEmpty.vue'
 import { computed, ref, reactive, onMounted } from 'vue'
 import { getDashboards, createDashboard, updateDashboard, deleteDashboard } from '../../api/dashboard'

@@ -20,13 +20,10 @@ var configYaml []byte
 type LogConfig = logger.Config
 
 type Config struct {
-	Log              LogConfig
-	ServerPort       string
-	JWTSecret        string
-	DBDSN            string
-	AnthropicBaseURL string
-	AnthropicAPIKey  string
-	AnthropicModel   string
+	Log        LogConfig
+	ServerPort string
+	JWTSecret  string
+	DBDSN      string
 }
 
 type fileConfig struct {
@@ -40,11 +37,6 @@ type fileConfig struct {
 	Database struct {
 		DSN string `mapstructure:"dsn"`
 	} `mapstructure:"database"`
-	AI struct {
-		BaseURL string `mapstructure:"base_url"`
-		APIKey  string `mapstructure:"api_key"`
-		Model   string `mapstructure:"model"`
-	} `mapstructure:"ai"`
 }
 
 var bindings = []struct {
@@ -57,9 +49,6 @@ var bindings = []struct {
 	{"server.addr", []string{"APP_SERVER_ADDR", "SERVER_PORT"}},
 	{"auth.jwt_secret", []string{"APP_AUTH_JWT_SECRET", "JWT_SECRET"}},
 	{"database.dsn", []string{"APP_DATABASE_DSN", "DB_DSN"}},
-	{"ai.base_url", []string{"APP_AI_BASE_URL", "ANTHROPIC_BASE_URL"}},
-	{"ai.api_key", []string{"APP_AI_API_KEY", "ANTHROPIC_API_KEY"}},
-	{"ai.model", []string{"APP_AI_MODEL", "ANTHROPIC_MODEL"}},
 }
 
 func defaults() (*viper.Viper, error) {
@@ -167,7 +156,6 @@ func decode(v *viper.Viper) (Config, error) {
 	return Config{
 		Log:        raw.Log,
 		ServerPort: raw.Server.Addr, JWTSecret: raw.Auth.JWTSecret, DBDSN: raw.Database.DSN,
-		AnthropicBaseURL: raw.AI.BaseURL, AnthropicAPIKey: raw.AI.APIKey, AnthropicModel: raw.AI.Model,
 	}, nil
 }
 

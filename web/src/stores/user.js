@@ -14,6 +14,9 @@ export const useUserStore = defineStore('user', {
   },
   actions: {
     acceptToken(token) {
+      this.userInfo = null
+      this.permissions = []
+      this.menus = []
       this.token = token
       setToken(token)
     },

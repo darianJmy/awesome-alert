@@ -28,7 +28,7 @@ import (
 
 func ListDatasources(c *gin.Context) {
 	var datasources []models.Datasource
-	database.DB.Order("id ASC").Find(&datasources)
+	database.DB.Where("type IN ?", supportedDatasourceTypes()).Order("id ASC").Find(&datasources)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": datasources})
 }
 
@@ -49,88 +49,26 @@ type CreateDatasourceReq struct {
 	Remark       string `json:"remark"`
 }
 
-func CreateDatasource(c *gin.Context) {
-	var req CreateDatasourceReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
-		return
-	}
-	labels, err := normalizeDatasourceLabels(req.Labels)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
-		return
-	}
-	req.Labels = labels
-	if req.AuthType == "" {
-		req.AuthType = "none"
-	}
-	if req.Category == "" {
-		req.Category = categoryByType(req.Type)
-	}
-	if req.Status == 0 {
-		req.Status = 1
-	}
-
-	ds := models.Datasource{
-		Name:         req.Name,
-		Category:     req.Category,
-		Type:         req.Type,
-		URL:          req.URL,
-		AuthType:     req.AuthType,
-		AuthConfig:   req.AuthConfig,
-		Labels:       req.Labels,
-		Region:       req.Region,
-		Env:          req.Env,
-		Domain:       req.Domain,
-		Capabilities: normalizeCapabilities(req.Capabilities, req.Type),
-		Priority:     priorityOrDefault(req.Priority),
-		Status:       req.Status,
-		Remark:       req.Remark,
-	}
-	database.DB.Create(&ds)
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
-}
-
-func UpdateDatasource(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	var req CreateDatasourceReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
-		return
-	}
-	labels, err := normalizeDatasourceLabels(req.Labels)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
-		return
-	}
-	req.Labels = labels
-
-	database.DB.Model(&models.Datasource{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"name":         req.Name,
-		"category":     req.Category,
-		"type":         req.Type,
-		"url":          req.URL,
-		"auth_type":    req.AuthType,
-		"auth_config":  req.AuthConfig,
-		"labels":       req.Labels,
-		"region":       req.Region,
-		"env":          req.Env,
-		"domain":       req.Domain,
-		"capabilities": normalizeCapabilities(req.Capabilities, req.Type),
-		"priority":     priorityOrDefault(req.Priority),
-		"status":       req.Status,
-		"remark":       req.Remark,
-	})
-
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功"})
-}
+func CreateDatasource(c *gin.Context) { CreateDatasourceWithTunnel(c) }
+func UpdateDatasource(c *gin.Context) { UpdateDatasourceWithTunnel(c) }
 
 func DeleteDatasource(c *gin.Context) {
 	id := c.Param("id")
+	numericID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil || numericID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "实例 ID 不正确"})
+		return
+	}
+	if !requireSupportedDatasourceIDs(c, []uint{uint(numericID)}) {
+		return
+	}
 	var groupCount int64
 	database.DB.Model(&models.DatasourceGroupMember{}).Where("datasource_id = ?", id).Count(&groupCount)
 	if groupCount > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "该接入仍属于数据源分组，请先从数据源分组移除"})
+		return
+	}
+	if !requireUnboundDatasources(c, []uint{uint(numericID)}) {
 		return
 	}
 	database.DB.Delete(&models.Datasource{}, id)
@@ -192,7 +130,7 @@ func TestDatasourceConnection(c *gin.Context) {
 func TestSavedDatasourceConnection(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var ds models.Datasource
-	if err := database.DB.First(&ds, id).Error; err != nil {
+	if err := database.DB.Where("type IN ?", supportedDatasourceTypes()).First(&ds, id).Error; err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": 404, "message": "数据源不存在"})
 		return
 	}
@@ -209,6 +147,9 @@ func TestSavedDatasourceConnection(c *gin.Context) {
 		ds.Type = req.Type
 	}
 	if strings.TrimSpace(req.AuthType) != "" {
+		if ds.AuthType != req.AuthType {
+			ds.AuthConfig = ""
+		}
 		ds.AuthType = req.AuthType
 	}
 	if strings.TrimSpace(req.AuthConfig) != "" {
@@ -234,39 +175,11 @@ func testConnection(dsType, url, authType, authConfig, config string) (bool, str
 }
 
 func testConnectionForDatasource(ds models.Datasource) (bool, string) {
-	dsType := ds.Type
-	rawURL := ds.URL
-	switch dsType {
-	case "prometheus":
-		return testPrometheus(ds)
-	case "mysql":
-		return testMySQL(rawURL)
-	case "tcp":
-		return testTCP(rawURL)
-	case "dns":
-		return testDNS(rawURL)
-	case "icmp":
-		return testICMP(rawURL)
-	case "jaeger":
-		return testJaeger(ds)
-	case "loki":
-		return testLoki(ds)
-	case "sls":
-		return testSLS(rawURL, ds.AuthConfig, ds.Config)
-	case "cls":
-		return testCLS(rawURL, ds.AuthConfig, ds.Config)
-	case "k8s":
-		return testK8s(rawURL, ds.AuthType, ds.AuthConfig)
-	case "nacos":
-		return testNacos(ds)
-	case "kafka":
-		return testKafka(rawURL, ds.AuthType, ds.AuthConfig)
-	default:
-		if isHTTPURL(rawURL) {
-			return testHTTP(ds)
-		}
-		return true, "配置已保存；该类型的专用连接校验待接入"
+	if err := validateDatasourceConnection(ds); err != nil {
+		return false, err.Error()
 	}
+	definition, _ := datasourceDefinitionFor(ds.Type)
+	return definition.testConnection(ds)
 }
 
 func testK8s(endpoint, authType, authConfigJSON string) (bool, string) {
@@ -355,7 +268,7 @@ func k8sTokenFromAuthConfig(authConfigJSON string) string {
 
 func categoryByType(dsType string) string {
 	switch dsType {
-	case "prometheus", "loki", "elasticsearch", "jaeger", "opentelemetry", "sls", "cls", "trace":
+	case "prometheus", "victoriametrics", "loki", "elasticsearch", "jaeger", "opentelemetry", "sls", "cls", "trace":
 		return "observability"
 	case "mysql", "clickhouse", "postgresql", "redis", "influxdb":
 		return "database"
@@ -398,7 +311,7 @@ func normalizeCapabilities(value, dsType string) string {
 
 func defaultCapabilitiesByType(dsType string) []string {
 	switch dsType {
-	case "prometheus":
+	case "prometheus", "victoriametrics":
 		return []string{"metrics"}
 	case "sls", "cls", "loki", "elasticsearch":
 		return []string{"logs"}
@@ -436,38 +349,27 @@ func testPrometheus(ds models.Datasource) (bool, string) {
 		return false, err.Error()
 	}
 	defer cleanup()
-
-	endpoint := strings.TrimRight(ds.URL, "/") + "/api/v1/status/buildinfo"
-	resp, err := client.Get(endpoint)
+	response, err := client.Get(strings.TrimRight(ds.URL, "/") + "/api/v1/status/buildinfo")
 	if err != nil {
-		endpoint = strings.TrimRight(ds.URL, "/") + "/-/healthy"
-		resp, err = client.Get(endpoint)
-		if err != nil {
-			return false, "连接失败: " + err.Error()
-		}
+		return false, "连接失败: " + err.Error()
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return false, "Prometheus 返回异常状态码: " + strconv.Itoa(resp.StatusCode)
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return false, fmt.Sprintf("Prometheus 返回 HTTP %d", response.StatusCode)
 	}
-
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return false, "解析响应失败: " + err.Error()
+	var result struct {
+		Status string `json:"status"`
+		Data   struct {
+			Version string `json:"version"`
+		} `json:"data"`
 	}
-
-	if status, ok := result["status"]; ok && status == "success" {
-		version := "unknown"
-		if data, ok := result["data"].(map[string]interface{}); ok {
-			if v, ok := data["version"]; ok {
-				version = v.(string)
-			}
-		}
-		return true, "连接成功 (Prometheus " + version + ")"
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&result); err != nil {
+		return false, "不是有效的 Prometheus API 响应"
 	}
-
-	return true, "连接成功"
+	if result.Status != "success" || result.Data.Version == "" {
+		return false, "未返回有效的 Prometheus 版本信息，请检查接入地址"
+	}
+	return true, "连接成功 (Prometheus " + result.Data.Version + ")"
 }
 
 func testHTTP(ds models.Datasource) (bool, string) {

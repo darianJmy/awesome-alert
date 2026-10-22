@@ -2,11 +2,9 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"guanlan/internal/database"
 	"guanlan/internal/models"
 	"testing"
-	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -81,17 +79,5 @@ func TestAIToolPermissionsAndHistory(t *testing.T) {
 	}
 	if got := collectChatHistoryBefore(7, 3); got != "user: previous\n" {
 		t.Fatalf("history not scoped: %q", got)
-	}
-}
-
-func TestLLMRetryWaitCanBeCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	start := time.Now()
-	if err := waitForLLMRetry(ctx, time.Hour); !errors.Is(err, context.Canceled) {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if time.Since(start) > time.Second {
-		t.Fatal("cancelled retry blocked")
 	}
 }

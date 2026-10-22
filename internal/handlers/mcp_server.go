@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"guanlan/internal/database"
@@ -253,8 +254,12 @@ func executeMCPTool(name string, args map[string]interface{}) (interface{}, erro
 }
 
 func mcpQueryAlerts(args map[string]interface{}) (interface{}, error) {
+	return mcpQueryAlertsContext(context.Background(), args)
+}
+
+func mcpQueryAlertsContext(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	page, pageSize := mcpPagination(args)
-	query := database.DB.Model(&models.AlertInstance{})
+	query := database.DB.WithContext(ctx).Model(&models.AlertInstance{})
 	switch mcpStringArg(args, "status") {
 	case "active":
 		query = query.Where("status IN ?", []string{alertStatusPending, alertStatusFiring, alertStatusRecovering})
@@ -289,8 +294,12 @@ func mcpQueryAlerts(args map[string]interface{}) (interface{}, error) {
 }
 
 func mcpQueryAlertRules(args map[string]interface{}) (interface{}, error) {
+	return mcpQueryAlertRulesContext(context.Background(), args)
+}
+
+func mcpQueryAlertRulesContext(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	page, pageSize := mcpPagination(args)
-	query := database.DB.Model(&models.AlertRule{})
+	query := database.DB.WithContext(ctx).Model(&models.AlertRule{})
 	if value := mcpStringArg(args, "keyword"); value != "" {
 		like := "%" + value + "%"
 		query = query.Where("name LIKE ? OR expression LIKE ?", like, like)
@@ -319,8 +328,12 @@ func mcpQueryAlertRules(args map[string]interface{}) (interface{}, error) {
 }
 
 func mcpQueryProbeTasks(args map[string]interface{}) (interface{}, error) {
+	return mcpQueryProbeTasksContext(context.Background(), args)
+}
+
+func mcpQueryProbeTasksContext(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	page, pageSize := mcpPagination(args)
-	query := database.DB.Model(&models.InspectionItem{})
+	query := database.DB.WithContext(ctx).Model(&models.InspectionItem{})
 	if value := mcpStringArg(args, "type"); value != "" {
 		query = query.Where("type = ?", value)
 	}
@@ -345,8 +358,12 @@ func mcpQueryProbeTasks(args map[string]interface{}) (interface{}, error) {
 }
 
 func mcpQueryAutomationTasks(args map[string]interface{}) (interface{}, error) {
+	return mcpQueryAutomationTasksContext(context.Background(), args)
+}
+
+func mcpQueryAutomationTasksContext(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	page, pageSize := mcpPagination(args)
-	query := database.DB.Model(&models.AutomationTask{})
+	query := database.DB.WithContext(ctx).Model(&models.AutomationTask{})
 	if value := mcpStringArg(args, "keyword"); value != "" {
 		like := "%" + value + "%"
 		query = query.Where("name LIKE ? OR description LIKE ?", like, like)

@@ -16,6 +16,8 @@ const staticRoutes = [
     redirect: '/dashboard',
     children: [
       { path: 'chat', redirect: '/dashboard' },
+      { path: 'settings/mcp', redirect: '/dashboard' },
+      { path: 'inspection', redirect: '/inspection/items' },
       {
         path: 'dashboard',
         name: 'Dashboard',
@@ -54,9 +56,11 @@ const staticRoutes = [
         path: 'inspection/workflows',
         redirect: '/automation/workflows',
       },
+      { path: 'inspection/probe', redirect: '/inspection/items/create' },
+      { path: 'automation/scheduled-tasks', redirect: '/inspection/items' },
       {
         path: 'inspection/scheduled-tasks',
-        redirect: '/automation/scheduled-tasks',
+        redirect: '/inspection/items',
       },
       {
         path: 'inspection/items/groups/:groupId',
@@ -147,9 +151,9 @@ const componentMap = {
   'system/MenuManage': () => import('../views/system/MenuManage.vue'),
   'system/GitCredentialManage': () => import('../views/system/GitCredentialManage.vue'),
   'system/BasicSetting': () => import('../views/system/BasicSetting.vue'),
+  'system/AIModelManage': () => import('../views/system/AIModelManage.vue'),
   'system/AuthSetting': () => import('../views/system/AuthSetting.vue'),
   'system/APITokenManage': () => import('../views/system/APITokenManage.vue'),
-  'system/MCPServiceManage': () => import('../views/system/MCPServiceManage.vue'),
   'monitor/IntegrationManage': () => import('../views/monitor/IntegrationManage.vue'),
   'monitor/DashboardManage': () => import('../views/monitor/DashboardManage.vue'),
   'monitor/GrafanaDashboardManage': () => import('../views/monitor/GrafanaDashboardManage.vue'),
@@ -166,11 +170,15 @@ const componentMap = {
   'certificate/ExecutorManage': () => import('../views/certificate/ExecutorManage.vue'),
   'automation/ScriptLibrary': () => import('../views/automation/ScriptLibrary.vue'),
 	'automation/AutomationTaskManage': () => import('../views/automation/AutomationTaskManage.vue'),
-  'inspection/InstantProbe': () => import('../views/inspection/InstantProbe.vue'),
   'inspection/InspectionManage': () => import('../views/inspection/InspectionRuleGroupList.vue'),
   'inspection/WorkflowManage': () => import('../views/inspection/WorkflowManage.vue'),
   'inspection/ExecutionRecords': () => import('../views/inspection/ExecutionRecords.vue'),
-  'inspection/ScheduledTaskManage': () => import('../views/inspection/ScheduledTaskManage.vue'),
+}
+
+const dynamicRouteRemovers = []
+
+function resetDynamicRoutes() {
+  dynamicRouteRemovers.splice(0).forEach(removeRoute => removeRoute())
 }
 
 function addDynamicRoutes(menus) {
@@ -179,12 +187,13 @@ function addDynamicRoutes(menus) {
       if (menu.path === '/chat' || menu.component === 'Chat') return
       if (menu.type === 2 && menu.component) {
         const routePath = menu.path.replace(/^\//, '')
-        router.addRoute('Layout', {
+        const removeRoute = router.addRoute('Layout', {
           path: routePath,
           name: menu.name,
           component: componentMap[menu.component],
           meta: { title: menu.name },
         })
+        dynamicRouteRemovers.push(removeRoute)
       }
       if (menu.children && menu.children.length > 0) {
         addRouteFromMenu(menu.children, parentPath)
@@ -194,11 +203,12 @@ function addDynamicRoutes(menus) {
   addRouteFromMenu(menus)
 }
 
-const whiteList = ['/login']
-let hasFetched = false
-
 router.beforeEach(async (to, from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - 观澜运维平台` : '观澜运维平台'
+
+  const store = useUserStore()
+  // Profile and routes belong to the current login, not the page lifetime.
+  if (!store.userInfo) resetDynamicRoutes()
 
   if (to.meta.noAuth) {
     next()
@@ -207,19 +217,20 @@ router.beforeEach(async (to, from, next) => {
 
   const token = getToken()
   if (!token) {
+    store.logout()
+    resetDynamicRoutes()
     next('/login')
     return
   }
 
-  const store = useUserStore()
-  if (!hasFetched) {
+  if (!store.userInfo) {
     try {
       await store.fetchUserInfo()
-      hasFetched = true
       addDynamicRoutes(store.menus)
-      next({ ...to, replace: true })
+      next({ path: to.path, query: to.query, hash: to.hash, replace: true })
     } catch {
       store.logout()
+      resetDynamicRoutes()
       next('/login')
     }
     return

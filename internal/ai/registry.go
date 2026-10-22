@@ -28,6 +28,9 @@ func (r *Registry) Register(spec ToolSpec, handler ToolHandler) error {
 	if handler == nil {
 		return fmt.Errorf("tool handler is required: %s", spec.Name)
 	}
+	if _, exists := r.tools[spec.Name]; exists {
+		return fmt.Errorf("tool already registered: %s", spec.Name)
+	}
 	r.tools[spec.Name] = Tool{Spec: spec, Handler: handler}
 	return nil
 }

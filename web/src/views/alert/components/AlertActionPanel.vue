@@ -18,8 +18,8 @@
     </el-table>
     <div class="pagination"><el-pagination v-model:current-page="rulePage" v-model:page-size="rulePageSize" :page-sizes="[10, 20, 50]" :total="filteredRules.length" layout="total, sizes, prev, pager, next" @size-change="rulePage = 1" /></div>
 
-    <el-drawer v-model="drawerVisible" class="center-drawer config-drawer action-drawer" size="620px" :close-on-click-modal="false" destroy-on-close>
-      <template #header><div class="drawer-header"><el-button text :icon="ArrowLeft" class="back-button" @click="drawerVisible = false">返回</el-button><span class="drawer-title">{{ form.id ? '编辑处置规则' : '创建处置规则' }}</span></div></template>
+    <el-drawer v-model="drawerVisible" class="center-drawer config-drawer action-drawer" size="min(460px, 94vw)" :close-on-click-modal="false" destroy-on-close>
+      <template #header><div class="drawer-header"><DrawerBackButton @click="drawerVisible = false" /><span class="drawer-title">{{ form.id ? '编辑处置规则' : '创建处置规则' }}</span></div></template>
       <el-form label-position="top" class="strategy-form action-form">
         <el-form-item label="规则名称" required>
           <el-input v-model="form.name" maxlength="128" show-word-limit aria-label="处置规则名称" />
@@ -62,6 +62,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../../components/DrawerBackButton.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ArrowLeft, Delete, Plus, QuestionFilled, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -141,7 +142,7 @@ function formatDuration(seconds) { const value = Number(seconds || 0); if (value
 
 <style scoped>
 .action-panel{min-width:0}
-.strategy-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.strategy-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .strategy-toolbar>div{display:flex;align-items:center;gap:8px}
 .strategy-toolbar .el-input{width:240px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#48566a;font-size:12px}

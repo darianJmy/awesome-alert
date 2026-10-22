@@ -52,8 +52,8 @@
       </div>
     </section>
 
-    <el-drawer v-model="repositoryVisible" class="repository-drawer" size="680px" :close-on-click-modal="false">
-      <template #header><div class="drawer-title">{{ repositoryForm.id ? '编辑 Git 仓库' : '创建 Git 仓库' }}<small>仓库由平台拉取，执行节点不会获得 Git 凭据</small></div></template>
+    <el-drawer v-model="repositoryVisible" class="repository-drawer" size="min(460px, 94vw)" :close-on-click-modal="false">
+      <template #header><div class="standard-drawer-header"><DrawerBackButton @click="repositoryVisible = false" /><div class="drawer-title">{{ repositoryForm.id ? '编辑 Git 仓库' : '创建 Git 仓库' }}<small>仓库由平台拉取，执行节点不会获得 Git 凭据</small></div></div></template>
       <el-form label-position="top">
         <el-form-item label="仓库名称" required><el-input v-model="repositoryForm.name" maxlength="128" /></el-form-item>
         <el-form-item label="仓库地址" required><el-input v-model="repositoryForm.repository_url" placeholder="https://git.example.com/team/ops.git" /></el-form-item>
@@ -69,6 +69,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'

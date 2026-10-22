@@ -31,3 +31,7 @@ export function testConnection(data) {
 export function testSavedConnection(id, data) {
   return request({ url: `/datasources/${id}/test`, method: 'post', data })
 }
+
+export function getDatasourceTypes() {
+  return request({ url: '/datasource-types', method: 'get' })
+}

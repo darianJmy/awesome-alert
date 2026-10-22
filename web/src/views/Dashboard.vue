@@ -37,8 +37,8 @@
             <el-empty v-else :description="overview ? '当前没有活跃告警' : '暂无统计数据'" :image-size="80" />
           </section>
           <section class="chart-card">
-            <div class="chart-heading"><div><h2>数据源接入分布</h2></div><span class="chart-total">{{ summary.datasources ?? '—' }} <small>个</small></span></div>
-            <VChart v-if="overview?.datasource_types.length" class="distribution-chart" :option="datasourceOption" autoresize aria-label="数据源类型分布" />
+            <div class="chart-heading"><div><h2>数据源接入状态</h2></div><span class="chart-total">{{ summary.datasources ?? '—' }} <small>个</small></span></div>
+            <VChart v-if="summary.datasources > 0" class="distribution-chart" :option="datasourceOption" autoresize aria-label="数据源实例启用状态" />
             <el-empty v-else :description="overview ? '尚未接入数据源' : '暂无统计数据'" :image-size="80" />
           </section>
         </div>
@@ -76,7 +76,7 @@ const points = computed(() => overview.value?.points || [])
 const alertTotal = computed(() => points.value.reduce((sum, point) => sum + point.alerts, 0))
 const notificationTotal = computed(() => points.value.reduce((sum, point) => sum + point.notifications_success + point.notifications_failed, 0))
 const cards = computed(() => [
-  { label: 'Prometheus 接入', value: summary.value.prometheus ?? '—', icon: Monitor, tone: 'purple' },
+  { label: '数据源接入', value: summary.value.datasources ?? '—', icon: Monitor, tone: 'purple' },
   { label: 'Agent 探针', value: summary.value.probe_agents ?? '—', icon: Cpu, tone: 'green' },
   { label: '拨测任务', value: summary.value.probe_tasks ?? '—', icon: Aim, tone: 'blue' },
   { label: '今日发生告警', value: summary.value.today_alerts ?? '—', icon: Bell, tone: 'orange' },
@@ -106,8 +106,8 @@ const datasourceOption = computed(() => ({
   color: ['#6887e8'], tooltip: { trigger: 'axis', renderMode: 'richText', axisPointer: { type: 'shadow' } },
   grid: { left: 12, right: 28, top: 14, bottom: 12, containLabel: true },
   xAxis: { type: 'value', minInterval: 1, axisLabel: { color: colors.value.text }, splitLine: { lineStyle: { color: colors.value.line } } },
-  yAxis: { type: 'category', inverse: true, data: (overview.value?.datasource_types || []).map(item => item.name || '未分类'), axisLabel: { color: colors.value.text }, axisTick: { show: false }, axisLine: { show: false } },
-  series: [{ type: 'bar', barMaxWidth: 22, itemStyle: { borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: colors.value.text }, data: (overview.value?.datasource_types || []).map(item => item.count) }],
+  yAxis: { type: 'category', inverse: true, data: ['启用', '禁用'], axisLabel: { color: colors.value.text }, axisTick: { show: false }, axisLine: { show: false } },
+  series: [{ type: 'bar', barMaxWidth: 22, itemStyle: { borderRadius: [0, 5, 5, 0] }, label: { show: true, position: 'right', color: colors.value.text }, data: [Number(summary.value.datasources_enabled || 0), Math.max(0, Number(summary.value.datasources || 0) - Number(summary.value.datasources_enabled || 0))] }],
 }))
 let requestID = 0, refreshTimer
 async function loadOverview() {

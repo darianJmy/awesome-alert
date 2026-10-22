@@ -1,10 +1,10 @@
 <template>
   <div class="integration-page">
     <el-tabs v-model="activeTab" class="integration-tabs" @tab-change="changeTab">
-      <el-tab-pane label="数据源" name="sources">
+      <el-tab-pane label="数据源实例" name="sources">
         <DatasourceManage />
       </el-tab-pane>
-      <el-tab-pane label="数据源分组" name="workspaces" lazy>
+      <el-tab-pane label="实例分组" name="workspaces" lazy>
         <DatasourceGroupManage />
       </el-tab-pane>
     </el-tabs>

@@ -137,12 +137,12 @@ func normalizeDatasourceGroupInput(req saveDatasourceGroupReq) (string, string, 
 	}
 	datasourceIDs := normalizeChannelIDs(req.DatasourceIDs)
 	if len(datasourceIDs) == 0 {
-		return "", "", nil, fmt.Errorf("请至少选择一个 Prometheus 数据源")
+		return "", "", nil, fmt.Errorf("请至少选择一个指标数据源")
 	}
 	var count int64
-	database.DB.Model(&models.Datasource{}).Where("id IN ? AND type = ? AND status = 1", datasourceIDs, "prometheus").Count(&count)
+	database.DB.Model(&models.Datasource{}).Where("id IN ? AND type IN ? AND status = 1", datasourceIDs, metricDatasourceTypes()).Count(&count)
 	if count != int64(len(datasourceIDs)) {
-		return "", "", nil, fmt.Errorf("数据源不存在、已停用或不是 Prometheus 类型")
+		return "", "", nil, fmt.Errorf("数据源不存在、已停用或不支持指标查询")
 	}
 	return name, description, datasourceIDs, nil
 }
@@ -205,12 +205,14 @@ func datasourceGroupResponse(group models.DatasourceGroup) gin.H {
 	datasourceNames := make([]string, 0, len(members))
 	for _, member := range members {
 		var datasource models.Datasource
-		database.DB.Select("id", "name").First(&datasource, member.DatasourceID)
+		if database.DB.Where("type IN ?", supportedDatasourceTypes()).Select("id", "name").First(&datasource, member.DatasourceID).Error != nil {
+			continue
+		}
 		datasourceIDs = append(datasourceIDs, member.DatasourceID)
 		datasourceNames = append(datasourceNames, datasource.Name)
 	}
 	var usageCount, ruleCount int64
 	database.DB.Table("alert_rules").Joins("JOIN alert_rule_datasource_groups ON alert_rule_datasource_groups.rule_id = alert_rules.id").Where("alert_rule_datasource_groups.datasource_group_id = ?", group.ID).Distinct("alert_rules.group_id").Count(&usageCount)
 	database.DB.Model(&models.AlertRuleDatasourceGroup{}).Where("datasource_group_id = ?", group.ID).Count(&ruleCount)
-	return gin.H{"id": group.ID, "name": group.Name, "description": group.Description, "datasource_ids": datasourceIDs, "datasource_names": datasourceNames, "member_count": len(members), "usage_count": usageCount, "rule_count": ruleCount, "created_at": group.CreatedAt, "updated_at": group.UpdatedAt}
+	return gin.H{"id": group.ID, "name": group.Name, "description": group.Description, "datasource_ids": datasourceIDs, "datasource_names": datasourceNames, "member_count": len(datasourceIDs), "usage_count": usageCount, "rule_count": ruleCount, "created_at": group.CreatedAt, "updated_at": group.UpdatedAt}
 }

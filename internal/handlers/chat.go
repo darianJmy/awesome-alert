@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -116,6 +117,7 @@ func chatConversationScope(db *gorm.DB, userID uint) *gorm.DB {
 // ── Chat (核心) ──
 
 type ChatReq struct {
+	ModelID        uint   `json:"model_id"`
 	ConversationID uint   `json:"conversation_id"`
 	WorkspaceID    uint   `json:"workspace_id"`
 	Message        string `json:"message" binding:"required"`
@@ -138,9 +140,26 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
+	// Validate ownership and chosen model before saving any messages.
+	if req.ConversationID != 0 {
+		convo, ok := findOwnedConversation(c, strconv.FormatUint(uint64(req.ConversationID), 10))
+		if !ok {
+			return
+		}
+		req.WorkspaceID = convo.WorkspaceID
+		if req.ModelID == 0 {
+			req.ModelID = convo.ModelID
+		}
+	}
+	selectedModel, err := resolveAIModel(c.Request.Context(), req.ModelID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	req.ModelID = selectedModel.ID
 	// 确保会话存在
 	if req.ConversationID == 0 {
-		convo := models.ChatConversation{UserID: userID, Title: truncateStr(req.Message, 30), WorkspaceID: req.WorkspaceID}
+		convo := models.ChatConversation{UserID: userID, Title: truncateStr(req.Message, 30), WorkspaceID: req.WorkspaceID, ModelID: req.ModelID}
 		if err := database.DB.Create(&convo).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建对话失败"})
 			return
@@ -160,6 +179,10 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 	defer release()
+	if err := database.DB.Model(&models.ChatConversation{}).Where("id = ? AND user_id = ?", req.ConversationID, userID).Update("model_id", req.ModelID).Error; err != nil {
+		c.JSON(500, gin.H{"code": 500, "message": "保存模型选择失败"})
+		return
+	}
 
 	// 保存用户消息
 	userMsg := models.ChatMessage{ConversationID: req.ConversationID, Role: "user", Content: req.Message}
@@ -171,7 +194,7 @@ func SendMessage(c *gin.Context) {
 	// 当前问题单独传入，历史仅包含此前已保存的消息。
 	chatHistory := collectChatHistoryBefore(req.ConversationID, userMsg.ID)
 	memoryContext := collectMemoryContext(userID, req.WorkspaceID)
-	response, metadata := runAIOrchestrator(c.Request.Context(), userID, req.WorkspaceID, req.Message, chatHistory, memoryContext)
+	response, metadata := runAIOrchestrator(c.Request.Context(), userID, req.WorkspaceID, req.Message, chatHistory, memoryContext, selectedModel)
 
 	// 保存助手消息
 	metaJSON, _ := json.Marshal(metadata)
@@ -231,7 +254,7 @@ func currentUserID(c *gin.Context) uint {
 
 func collectDatasourceContext(workspaceID uint) string {
 	var ds []models.Datasource
-	tx := database.DB
+	tx := database.DB.Where("type IN ?", supportedDatasourceTypes())
 	if workspaceID > 0 {
 		ids, scoped := workspaceDatasourceIDs(workspaceID)
 		if scoped && len(ids) == 0 {
@@ -281,46 +304,9 @@ func collectMemoryContext(userID, workspaceID uint) string {
 	return sb.String()
 }
 
-func runAIOrchestrator(ctx context.Context, userID, workspaceID uint, question, history, memoryContext string) (string, map[string]interface{}) {
-	registry := buildOpsToolRegistry(workspaceID)
-	catalog := "[]"
-	if authorizeAITool(ctx, userID) == nil {
-		catalog = collectDatasourceCatalog(workspaceID)
-	} else {
-		registry = aicore.NewRegistry()
-	}
-	orchestrator := &aicore.Orchestrator{
-		Registry:       registry,
-		LLM:            callAnthropicForOrchestrator,
-		MaxRounds:      8,
-		MaxResultBytes: 64 * 1024,
-		Timeout:        120 * time.Second,
-		Authorize:      aiToolPolicy(userID),
-	}
-	result := orchestrator.Run(ctx, aicore.RunRequest{
-		Question:          question,
-		DatasourceCatalog: catalog,
-		History:           history,
-		Memory:            memoryContext,
-		PlatformKnowledge: collectPlatformKnowledge(),
-	})
-	if !result.Answered {
-		return "", result.Metadata
-	}
-	return result.Answer, result.Metadata
-}
-
-func callAnthropicForOrchestrator(ctx context.Context, systemPrompt string, messages []aicore.Message) (string, error) {
-	converted := make([]anthropicMessage, 0, len(messages))
-	for _, msg := range messages {
-		converted = append(converted, anthropicMessage{Role: msg.Role, Content: msg.Content})
-	}
-	return callAnthropic(ctx, systemPrompt, converted)
-}
-
 func collectDatasourceCatalog(workspaceID uint) string {
 	var ds []models.Datasource
-	tx := database.DB
+	tx := database.DB.Where("type IN ?", supportedDatasourceTypes())
 	if workspaceID > 0 {
 		ids, scoped := workspaceDatasourceIDs(workspaceID)
 		if scoped && len(ids) == 0 {
@@ -367,6 +353,7 @@ func workspaceDatasourceIDs(workspaceID uint) ([]uint, bool) {
 }
 
 func scopeDatasourceQuery(tx *gorm.DB, workspaceID uint) *gorm.DB {
+	tx = tx.Where("type IN ?", supportedDatasourceTypes())
 	ids, scoped := workspaceDatasourceIDs(workspaceID)
 	if !scoped {
 		return tx
@@ -378,7 +365,10 @@ func scopeDatasourceQuery(tx *gorm.DB, workspaceID uint) *gorm.DB {
 }
 
 func effectiveCapabilities(ds models.Datasource) string {
-	return normalizeCapabilities(ds.Capabilities, ds.Type)
+	if definition, ok := datasourceDefinitionFor(ds.Type); ok {
+		return strings.Join(definition.Capabilities, ",")
+	}
+	return ""
 }
 
 func datasourceLabels(ds models.Datasource) map[string]string {
@@ -386,123 +376,25 @@ func datasourceLabels(ds models.Datasource) map[string]string {
 }
 
 func datasourceCapabilities(dsType string) []string {
-	switch dsType {
-	case "prometheus":
-		return []string{"query_prometheus_instant", "query_prometheus"}
-	case "k8s":
-		return []string{"list_k8s_resources", "find_k8s_pod_anomalies", "get_k8s_pod_events", "get_k8s_pod_logs"}
-	case "cls":
-		return []string{"query_tencent_cls"}
-	case "sls":
-		return []string{"list_sls_logstores", "query_aliyun_sls"}
-	case "nacos":
-		return []string{"list_nacos_services"}
-	case "kafka":
-		return []string{"list_kafka_topics", "list_kafka_consumer_lag"}
-	default:
-		return []string{}
+	if isMetricDatasourceType(dsType) {
+		return []string{"query_prometheus_instant"}
 	}
+	return []string{}
 }
 
 func buildOpsToolRegistry(workspaceID uint) *aicore.Registry {
 	registry := aicore.NewRegistry()
 	mustRegisterTool(registry, aicore.ToolSpec{
 		Name:           "query_prometheus_instant",
-		Description:    "执行 Prometheus 即时 PromQL 查询。LLM 只传 datasource_id 和 promql，不传 URL。",
+		Description:    "执行 Prometheus 或 VictoriaMetrics 即时 PromQL 查询。LLM 只传 datasource_id 和 promql，不传 URL。",
 		DatasourceType: "prometheus",
 		Risk:           aicore.RiskReadonlyLow,
 		TimeoutSeconds: 10,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id": "number",
-			"promql":        "string",
+		ParamsSchema: map[string]*schema.ParameterInfo{
+			"datasource_id": {Type: schema.Integer, Required: true, Desc: "数据源 ID"},
+			"promql":        {Type: schema.String, Required: true, Desc: "PromQL 查询表达式"},
 		},
 	}, scopedToolHandler(workspaceID, handleQueryPrometheusInstant))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "list_k8s_resources",
-		Description:    "列出 Kubernetes 资源。支持 pods/services/ingresses/deployments/statefulsets/daemonsets/nodes/namespaces/servicemonitors/resourcequotas 等资源。",
-		DatasourceType: "k8s",
-		Risk:           aicore.RiskReadonlyLow,
-		TimeoutSeconds: 15,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id":  "number",
-			"resource":       "string",
-			"namespace":      "string optional",
-			"label_selector": "string optional",
-			"field_selector": "string optional",
-			"view":           "compact|raw optional",
-		},
-	}, scopedToolHandler(workspaceID, handleListK8sResources))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "find_k8s_pod_anomalies",
-		Description:    "查找异常 Pod。后端根据 phase、ready、waiting reason、terminated reason、restartCount 等判断异常。",
-		DatasourceType: "k8s",
-		Risk:           aicore.RiskReadonlyLow,
-		TimeoutSeconds: 15,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id":     "number",
-			"namespace":         "string optional",
-			"restart_threshold": "number optional default 3",
-		},
-	}, scopedToolHandler(workspaceID, handleFindK8sPodAnomalies))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "list_sls_logstores",
-		Description:    "列出阿里云 SLS Project 下的 Logstore。",
-		DatasourceType: "sls",
-		Risk:           aicore.RiskReadonlyLow,
-		TimeoutSeconds: 10,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id": "number",
-		},
-	}, scopedToolHandler(workspaceID, handleListSLSLogstoresTool))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "query_tencent_cls",
-		Description:    "检索腾讯云 CLS 日志。时间窗口最大 24h。",
-		DatasourceType: "cls",
-		Risk:           aicore.RiskReadonlyExpensive,
-		MaxTimeRange:   "24h",
-		TimeoutSeconds: 15,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id": "number",
-			"query":         "string",
-			"time_range":    "string optional, e.g. 30m or 1h",
-			"limit":         "number optional",
-		},
-	}, scopedToolHandler(workspaceID, handleQueryTencentCLSTool))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "list_nacos_services",
-		Description:    "查询 Nacos 服务注册列表。LLM 只传 datasource_id、namespace、group，不传 Nacos URL 或鉴权信息。",
-		DatasourceType: "nacos",
-		Risk:           aicore.RiskReadonlyLow,
-		TimeoutSeconds: 10,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id": "number",
-			"namespace":     "string optional, Nacos namespaceId",
-			"group":         "string optional, Nacos groupName",
-			"page_size":     "number optional, max 1000",
-		},
-	}, scopedToolHandler(workspaceID, handleListNacosServicesTool))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "list_kafka_topics",
-		Description:    "查询 Kafka topic 列表和分区数量。LLM 只传 datasource_id，不传 broker 地址或鉴权信息。",
-		DatasourceType: "kafka",
-		Risk:           aicore.RiskReadonlyLow,
-		TimeoutSeconds: 10,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id": "number",
-		},
-	}, scopedToolHandler(workspaceID, handleListKafkaTopicsTool))
-	mustRegisterTool(registry, aicore.ToolSpec{
-		Name:           "list_kafka_consumer_lag",
-		Description:    "查询 Kafka consumer group 消费位点和 lag，可按 group 过滤。LLM 只传 datasource_id 和可选 group。",
-		DatasourceType: "kafka",
-		Risk:           aicore.RiskReadonlyLow,
-		TimeoutSeconds: 15,
-		ParamsSchema: map[string]interface{}{
-			"datasource_id": "number",
-			"group":         "string optional",
-			"limit":         "number optional, partition rows max 1000",
-		},
-	}, scopedToolHandler(workspaceID, handleListKafkaConsumerLagTool))
 	return registry
 }
 
@@ -535,7 +427,7 @@ func handleQueryPrometheusInstant(ctx context.Context, call aicore.ToolCall) aic
 	if err != nil {
 		return toolError(call.Tool, "PROMETHEUS_QUERY_FAILED", err)
 	}
-	return aicore.ToolResult{Tool: call.Tool, OK: true, Summary: "Prometheus 查询成功", Data: map[string]interface{}{"datasource": ds.Name, "promql": promql, "result": value}}
+	return aicore.ToolResult{Tool: call.Tool, OK: true, Summary: "指标查询成功", Data: map[string]interface{}{"datasource": ds.Name, "promql": promql, "result": value}}
 }
 
 func handleListK8sResources(ctx context.Context, call aicore.ToolCall) aicore.ToolResult {
@@ -700,10 +592,13 @@ func handleListKafkaConsumerLagTool(ctx context.Context, call aicore.ToolCall) a
 }
 
 func loadDatasourceByToolParam(params map[string]interface{}, expectedType string) (models.Datasource, error) {
+	if !isMetricDatasourceType(expectedType) {
+		return models.Datasource{}, fmt.Errorf("仅支持具备 PromQL 查询能力的指标数据源")
+	}
 	id := uint(intParam(params, "datasource_id"))
 	workspaceID := uint(intParam(params, "_workspace_id"))
 	var ds models.Datasource
-	tx := database.DB.Where("status = 1 AND type = ?", expectedType)
+	tx := database.DB.Where("status = 1 AND type IN ?", metricDatasourceTypes())
 	if workspaceID > 0 {
 		ids, scoped := workspaceDatasourceIDs(workspaceID)
 		if scoped && len(ids) == 0 {
@@ -845,11 +740,11 @@ func analyzeQuery(ctx context.Context, convoID, userID, workspaceID uint, questi
 		spec    promQuerySpec
 	}
 	var ds []models.Datasource
-	database.DB.Where("status = 1 AND type = ?", "prometheus").Find(&ds)
+	database.DB.Where("status = 1 AND type IN ?", metricDatasourceTypes()).Find(&ds)
 	ds = selectPromDatasourcesByQuestion(q, ds, defaultPromDatasourceName(userID))
 
 	if len(ds) == 0 {
-		return "当前没有可用的 Prometheus 接入，请先在「接入中心」中添加。", nil
+		return "当前没有可用的指标数据源接入，请先在「接入中心」中添加。", nil
 	}
 
 	includeOverview := containsAny(q, "综合", "整体", "总览", "概览", "性能", "资源", "健康", "状况", "情况")
@@ -998,26 +893,7 @@ func isCapabilityQuestion(q string) bool {
 }
 
 func formatOpsCapabilityHelp(dsContext string) string {
-	return fmt.Sprintf(`我是智能运维助手，当前平台已经接入了这些只读/低风险工具：
-
-- Prometheus：指标查询、CPU/内存/磁盘/节点状态、PromQL 即时查询。
-- Kubernetes：通用资源查询，支持 namespace、pod、node、service、deployment、event 等资源。
-- 阿里云 SLS：列出日志集。
-- 腾讯云 CLS：按关键词和时间范围检索日志。
-- 接入中心：可以辅助新增数据源，但写操作需要确认。
-- Skill：可以上传 Markdown 知识，让我学习平台规则、查询模板和排障流程。
-
-你可以这样问：
-
-- “test 环境 k8s 有哪些 namespace”
-- “kube-system 下有哪些 pod”
-- “test 环境有哪些 node”
-- “腾讯生产 CLS 上午 11 点到 11 点半有没有 error”
-- “个人 Prometheus CPU 使用率最高的主机”
-- “阿里云 SLS 有哪些日志集”
-
-当前可用数据源：
-%s`, dsContext)
+	return fmt.Sprintf("我可以查询 Prometheus 指标并辅助排查告警，例如主机 CPU、内存、磁盘和服务健康状态。接入中心支持 Prometheus 和 VictoriaMetrics；数据库和 Kubernetes 等组件可通过其监控指标分析。当前只支持只读查询。\n\n当前监控实例：\n%s", dsContext)
 }
 
 func tryAIToolPlan(ctx context.Context, question, dsContext, history, memoryContext string, workspaceID uint) (string, map[string]interface{}, bool) {
@@ -1067,7 +943,7 @@ func planAIToolCall(ctx context.Context, question, dsContext, history, memoryCon
 		prompt.WriteString("\n\n长期记忆:\n")
 		prompt.WriteString(memoryContext)
 	}
-	raw, err := callAnthropic(ctx, systemPrompt, []anthropicMessage{{Role: "user", Content: prompt.String()}})
+	raw, err := callLLM(ctx, systemPrompt, []anthropicMessage{{Role: "user", Content: prompt.String()}})
 	if err != nil {
 		return aiToolPlan{}, raw, err
 	}
@@ -1157,7 +1033,7 @@ func summarizeToolResultLLM(ctx context.Context, question string, plan aiToolPla
 - 如果是 Kubernetes List，优先总结数量、namespace、名称和关键状态。
 - Secret data 已脱敏，不要要求展示明文。`
 	prompt := fmt.Sprintf("用户问题:\n%s\n\n工具调用:\n%s\n数据源:\n%s\n\n工具结果 JSON:\n%s", question, plan.Tool, ds.Name, truncateStr(resultJSON, 18000))
-	return callAnthropic(ctx, systemPrompt, []anthropicMessage{{Role: "user", Content: prompt}})
+	return callLLM(ctx, systemPrompt, []anthropicMessage{{Role: "user", Content: prompt}})
 }
 
 func formatRawToolResult(tool, datasource, path string, result map[string]interface{}) string {
@@ -1661,6 +1537,8 @@ func extractDatasourceReq(question string) CreateDatasourceWithTunnelReq {
 	req := CreateDatasourceWithTunnelReq{AuthType: "none", Status: 1}
 	lower := strings.ToLower(q)
 	switch {
+	case strings.Contains(lower, "victoriametrics"):
+		req.Type = "victoriametrics"
 	case strings.Contains(lower, "prometheus"):
 		req.Type = "prometheus"
 	case strings.Contains(lower, "mysql"):
@@ -1890,7 +1768,7 @@ func askOpsLLM(ctx context.Context, question, dsContext, history, memoryContext 
 		prompt.WriteString("\n\n请总结当前状态、指出异常或风险，并给出下一步排查建议。")
 	}
 
-	return callAnthropic(ctx, systemPrompt, []anthropicMessage{
+	return callLLM(ctx, systemPrompt, []anthropicMessage{
 		{Role: "user", Content: prompt.String()},
 	})
 }

@@ -31,9 +31,9 @@ func TestAuditActionSkipsListsAndRecordsMeaningfulOperations(t *testing.T) {
 
 func TestSanitizeAuditMapRedactsNestedSecrets(t *testing.T) {
 	value := sanitizeAuditMap(map[string]interface{}{
-		"name": "production", "password": "plain-text", "auth_config": map[string]interface{}{"token": "abc", "endpoint": "https://example.com"},
+		"name": "production", "api_key": "model-secret", "password": "plain-text", "auth_config": map[string]interface{}{"token": "abc", "endpoint": "https://example.com"},
 	})
-	if value["password"] != "***" || value["auth_config"] != "***" {
+	if value["api_key"] != "***" || value["password"] != "***" || value["auth_config"] != "***" {
 		t.Fatalf("expected sensitive values to be redacted, got %#v", value)
 	}
 	if value["name"] != "production" {

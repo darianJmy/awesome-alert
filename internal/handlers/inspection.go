@@ -213,7 +213,7 @@ func BatchUpdateInspectionItemStatus(c *gin.Context) {
 	}
 	if *req.Status == 1 {
 		var retired int64
-		if err := database.DB.Model(&models.InspectionItem{}).Where("id IN ? AND type NOT IN ?", req.IDs, []string{"http", "icmp", "tcp", "certificate_expiry"}).Count(&retired).Error; err != nil {
+		if err := database.DB.Model(&models.InspectionItem{}).Where("id IN ? AND type NOT IN ?", req.IDs, []string{"http", "icmp", "tcp", "certificate_expiry", "script"}).Count(&retired).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "检查任务类型失败"})
 			return
 		}
@@ -662,7 +662,7 @@ func inspectionLabelSummary(labels map[string]string) string {
 
 func validateInspectionItemReq(req CreateInspectionItemReq) error {
 	taskType := strings.ToLower(strings.TrimSpace(req.Type))
-	if taskType != "http" && taskType != "icmp" && taskType != "tcp" && taskType != "certificate_expiry" {
+	if taskType != "http" && taskType != "icmp" && taskType != "tcp" && taskType != "certificate_expiry" && taskType != "script" {
 		return fmt.Errorf("不支持的拨测类型")
 	}
 	if req.IntervalSeconds < 10 || req.IntervalSeconds > 86400 {
@@ -682,6 +682,15 @@ func validateInspectionItemReq(req CreateInspectionItemReq) error {
 	}
 	if strings.TrimSpace(req.Config) == "" || !json.Valid([]byte(req.Config)) {
 		return fmt.Errorf("拨测配置格式不正确")
+	}
+	if taskType == "script" {
+		var config ProbeReq
+		if err := json.Unmarshal([]byte(req.Config), &config); err != nil {
+			return fmt.Errorf("脚本拨测配置格式不正确")
+		}
+		if _, err := loadProbeScript(config); err != nil {
+			return err
+		}
 	}
 	if taskType == "certificate_expiry" {
 		var config ProbeReq
@@ -852,7 +861,7 @@ func RunInspectionItem(c *gin.Context) {
 
 func RunAllInspections(c *gin.Context) {
 	var items []models.InspectionItem
-	database.DB.Where("status = 1 AND type IN ?", []string{"http", "icmp", "tcp", "certificate_expiry"}).Find(&items)
+	database.DB.Where("status = 1 AND type IN ?", []string{"http", "icmp", "tcp", "certificate_expiry", "script"}).Find(&items)
 	if len(items) == 0 {
 		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "无启用拨测任务"})
 		return
@@ -874,7 +883,13 @@ func RunAllInspections(c *gin.Context) {
 	})
 }
 
+var runningInspections sync.Map
+
 func executeAndRecordInspection(item *models.InspectionItem) models.InspectionRecord {
+	if _, running := runningInspections.LoadOrStore(item.ID, struct{}{}); running {
+		return models.InspectionRecord{ItemID: item.ID, Status: "error", Result: `{"error":"任务正在执行，请稍后重试"}`}
+	}
+	defer runningInspections.Delete(item.ID)
 	now := time.Now()
 	nodes := resolveInspectionExecutionNodes(item.Config)
 	if len(nodes) == 0 {
@@ -1285,7 +1300,7 @@ func ListInspectionRecords(c *gin.Context) {
 
 func executeInspection(item models.InspectionItem) (status, result string, durationMs int64) {
 	switch item.Type {
-	case "http", "icmp", "tcp", "certificate_expiry":
+	case "http", "icmp", "tcp", "certificate_expiry", "script":
 		return executeProbeTask(item)
 	default:
 		return "error", `{"error":"不支持的拨测类型: ` + item.Type + `"}`, 0
@@ -1298,6 +1313,9 @@ func executeProbeTask(item models.InspectionItem) (string, string, int64) {
 		return "error", mustJSON(gin.H{"error": "拨测配置解析失败: " + err.Error()}), 0
 	}
 	req.Type = item.Type
+	if req.Type == "script" {
+		return executeScriptProbe(req)
+	}
 	if req.Type == "http" {
 		if strings.TrimSpace(req.Target) == "" {
 			req.Target = item.Target

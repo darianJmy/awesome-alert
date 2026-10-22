@@ -52,7 +52,7 @@
     <el-drawer v-model="detailVisible" class="record-drawer" size="680px" direction="rtl">
       <template #header>
         <div class="drawer-header">
-          <span class="drawer-title">通知详情</span>
+          <DrawerBackButton @click="detailVisible = false" /><span class="drawer-title">通知详情</span>
         </div>
       </template>
 
@@ -102,6 +102,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { Refresh, Search, View } from '@element-plus/icons-vue'
 import { getNotificationRecords } from '../../api/notification'
@@ -122,8 +123,8 @@ const eventTypes = [
   { value: 'alert.group', label: '告警分组通知' },
   { value: 'probe.task.failure', label: '拨测任务失败' },
   { value: 'probe.task.recovery', label: '拨测任务恢复' },
-  { value: 'scheduled.task.firing', label: '自动化任务告警' },
-  { value: 'scheduled.task.recovery', label: '自动化任务恢复' },
+  { value: 'scheduled.task.firing', label: '历史定时任务告警' },
+  { value: 'scheduled.task.recovery', label: '历史定时任务恢复' },
   { value: 'certificate.domain.firing', label: '证书域名告警' },
   { value: 'certificate.domain.recovery', label: '证书域名恢复' },
   { value: 'certificate.domain.alert', label: '证书通知' },

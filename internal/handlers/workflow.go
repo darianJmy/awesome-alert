@@ -314,9 +314,8 @@ func workflowOutgoingTargets(step WorkflowStep) []string {
 func DeleteWorkflow(c *gin.Context) {
 	id := c.Param("id")
 	database.DB.Where("workflow_id = ?", id).Delete(&models.WorkflowExecution{})
-	database.DB.Model(&models.ScheduledTask{}).Where("type = ? AND target_id = ?", "workflow", id).Update("status", 0)
 	database.DB.Delete(&models.Workflow{}, id)
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功；引用该工作流的定时任务已停用"})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
 }
 
 func ExecuteWorkflow(c *gin.Context) {

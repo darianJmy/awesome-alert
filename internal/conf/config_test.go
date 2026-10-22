@@ -43,7 +43,7 @@ func TestDefaultsAndOptionalLocalFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ServerPort != ":9000" || cfg.AnthropicModel != "local-model" || cfg.DBDSN != DefaultConfig().DBDSN {
+	if cfg.ServerPort != ":9000" || cfg.DBDSN != DefaultConfig().DBDSN {
 		t.Fatalf("local config did not merge with defaults: %+v", cfg)
 	}
 }
@@ -57,7 +57,7 @@ func TestExplicitConfigAndEnvironmentPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ServerPort != ":9001" || cfg.JWTSecret != "file-secret" || cfg.DBDSN != "file-dsn" || cfg.AnthropicBaseURL != "https://example.com" || cfg.AnthropicAPIKey != "file-key" || cfg.AnthropicModel != "file-model" {
+	if cfg.ServerPort != ":9001" || cfg.JWTSecret != "file-secret" || cfg.DBDSN != "file-dsn" {
 		t.Fatalf("explicit config not loaded: %+v", cfg)
 	}
 	writeConfig(t, ".env", "APP_SERVER_ADDR=:9002\nAPP_AI_MODEL=dotenv-model\nAPP_DATABASE_DSN=dotenv-dsn\n")
@@ -69,7 +69,7 @@ func TestExplicitConfigAndEnvironmentPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ServerPort != ":9003" || cfg.DBDSN != "prefixed-dsn" || cfg.AnthropicModel != "dotenv-model" || cfg.AnthropicAPIKey != "" {
+	if cfg.ServerPort != ":9003" || cfg.DBDSN != "prefixed-dsn" {
 		t.Fatalf("incorrect precedence: %+v", cfg)
 	}
 	if _, ok := os.LookupEnv("APP_AI_MODEL"); ok {
@@ -89,7 +89,7 @@ func TestLegacyEnvironmentBindings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg != (Config{Log: DefaultConfig().Log, ServerPort: "127.0.0.1:9090", JWTSecret: "legacy-secret", DBDSN: "legacy-dsn", AnthropicBaseURL: "https://legacy.example.com", AnthropicAPIKey: "legacy-key", AnthropicModel: "legacy-model"}) {
+	if cfg != (Config{Log: DefaultConfig().Log, ServerPort: "127.0.0.1:9090", JWTSecret: "legacy-secret", DBDSN: "legacy-dsn"}) {
 		t.Fatalf("legacy binding failed: %+v", cfg)
 	}
 }
@@ -140,5 +140,13 @@ func TestLogConfigEnvironmentOverridesFile(t *testing.T) {
 	}
 	if cfg.Log.Level != "debug" || cfg.Log.Format != "json" || cfg.Log.File != "logs/env.log" {
 		t.Fatalf("incorrect logging config: %+v", cfg.Log)
+	}
+}
+
+func TestLegacyAIConfigIsIgnored(t *testing.T) {
+	isolate(t)
+	t.Setenv("APP_AI_PROVIDER", "unsupported")
+	if _, err := InitConfig(""); err != nil {
+		t.Fatal(err)
 	}
 }

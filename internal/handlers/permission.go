@@ -10,6 +10,6 @@ import (
 
 func ListPermissions(c *gin.Context) {
 	var permissions []models.Permission
-	database.DB.Order("id ASC").Find(&permissions)
+	database.DB.Where("code NOT LIKE ?", "task:%").Order("id ASC").Find(&permissions)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": permissions})
 }

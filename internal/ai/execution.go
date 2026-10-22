@@ -2,12 +2,9 @@ package ai
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"errors"
 	"fmt"
+	"github.com/cloudwego/eino/schema"
 	"math"
-	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -27,96 +24,6 @@ type RunTrace struct {
 	Status     string      `json:"status"`
 	DurationMS int64       `json:"duration_ms"`
 	Steps      []StepTrace `json:"steps"`
-}
-
-func (o *Orchestrator) Run(parent context.Context, req RunRequest) (response RunResponse) {
-	started := time.Now()
-	id := make([]byte, 16)
-	if _, err := rand.Read(id); err != nil {
-		return RunResponse{Answered: true, Answer: "无法创建分析任务，请重试。"}
-	}
-	trace := RunTrace{ID: hex.EncodeToString(id), Status: "failed", Steps: []StepTrace{}}
-	response.Metadata = map[string]interface{}{"orchestrator": true}
-	defer func() {
-		trace.DurationMS = time.Since(started).Milliseconds()
-		response.Metadata["execution"] = trace
-	}()
-	fail := func(code, answer string) RunResponse {
-		response.Answered, response.Answer = true, answer
-		response.Metadata["error_code"] = code
-		return response
-	}
-	budget := o.Timeout
-	if budget <= 0 {
-		budget = 120 * time.Second
-	}
-	ctx, cancel := context.WithTimeout(parent, budget)
-	defer cancel()
-	stopped := func() RunResponse {
-		trace.Status = "cancelled"
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			trace.Status = "timeout"
-			return fail("TIMEOUT", "本次分析已超时，请缩小查询范围后重试。")
-		}
-		return fail("CANCELLED", "本次分析已停止。")
-	}
-	if ctx.Err() != nil {
-		return stopped()
-	}
-	if o.Registry == nil || o.LLM == nil {
-		return fail("NOT_CONFIGURED", "AI 分析服务未配置完整。")
-	}
-	maxRounds := o.MaxRounds
-	if maxRounds <= 0 {
-		maxRounds = 8
-	}
-	conversation := []Message{{Role: "user", Content: o.initialPrompt(req)}}
-	for round := 1; round <= maxRounds; round++ {
-		if ctx.Err() != nil {
-			return stopped()
-		}
-		start := time.Now()
-		raw, err := o.LLM(ctx, o.systemPrompt(), conversation)
-		step := StepTrace{Round: round, Kind: "model", Status: "succeeded", DurationMS: time.Since(start).Milliseconds()}
-		if err != nil || ctx.Err() != nil {
-			step.Status, step.ErrorCode = "failed", "MODEL_ERROR"
-			trace.Steps = append(trace.Steps, step)
-			if ctx.Err() != nil {
-				return stopped()
-			}
-			return fail("MODEL_ERROR", "AI 服务暂时无法完成分析，请检查模型配置或稍后重试。")
-		}
-		parsed, err := parseModelResponse(raw)
-		if err != nil || (parsed.Type != "final" && parsed.Type != "tool_call") || (parsed.Type == "final" && strings.TrimSpace(parsed.Answer) == "") {
-			step.Status, step.ErrorCode = "failed", "INVALID_MODEL_RESPONSE"
-			trace.Steps = append(trace.Steps, step)
-			return fail("INVALID_MODEL_RESPONSE", "AI 返回格式不正确，本次分析已停止，请重试。")
-		}
-		trace.Steps = append(trace.Steps, step)
-		if parsed.Type == "final" {
-			trace.Status = "succeeded"
-			response.Answered, response.Answer = true, strings.TrimSpace(parsed.Answer)
-			return response
-		}
-		start = time.Now()
-		result := o.execute(ctx, ToolCall{Tool: parsed.Tool, Params: parsed.Params})
-		status := "succeeded"
-		if !result.OK {
-			status = "failed"
-		}
-		// Only registered names are exposed; an arbitrary model string may contain secrets.
-		toolName := parsed.Tool
-		if _, ok := o.Registry.Get(toolName); !ok {
-			toolName = "unknown"
-		}
-		trace.Steps = append(trace.Steps, StepTrace{Round: round, Kind: "tool", Tool: toolName, Status: status, DurationMS: time.Since(start).Milliseconds(), ErrorCode: result.ErrorCode})
-		if ctx.Err() != nil {
-			return stopped()
-		}
-		conversation = append(conversation, Message{Role: "assistant", Content: raw}, Message{Role: "user", Content: "工具返回:\n" + boundedResult(result, o.MaxResultBytes)})
-	}
-	trace.Status = "limited"
-	return fail("ROUND_LIMIT", "已达到本次分析的调用轮次上限，请缩小问题范围后重试。")
 }
 
 func (o *Orchestrator) execute(ctx context.Context, call ToolCall) ToolResult {
@@ -155,47 +62,89 @@ func (o *Orchestrator) execute(ctx context.Context, call ToolCall) ToolResult {
 	return result
 }
 
+// Validate the same Eino parameter contract used to generate the model's JSON Schema.
 func validateParams(spec ToolSpec, params map[string]interface{}) error {
-	for name := range params {
-		if _, ok := spec.ParamsSchema[name]; !ok {
+	return validateObject(spec.ParamsSchema, params, 0)
+}
+func validateObject(defs map[string]*schema.ParameterInfo, values map[string]interface{}, depth int) error {
+	if depth > 16 {
+		return fmt.Errorf("参数嵌套过深")
+	}
+	for name := range values {
+		if _, ok := defs[name]; !ok {
 			return fmt.Errorf("不支持的参数")
 		}
 	}
-	for name, raw := range spec.ParamsSchema {
-		schema, ok := raw.(string)
-		if !ok {
+	for name, def := range defs {
+		if def == nil {
 			return fmt.Errorf("工具参数定义无效")
 		}
-		value, exists := params[name]
-		if !exists || value == nil {
-			if strings.Contains(schema, "optional") {
-				continue
+		value, exists := values[name]
+		if !exists {
+			if def.Required {
+				return fmt.Errorf("缺少参数 %s", name)
 			}
-			return fmt.Errorf("缺少参数 %s", name)
+			continue
 		}
-		if strings.HasPrefix(schema, "number") {
-			n, ok := value.(float64)
-			if !ok || math.IsNaN(n) || math.IsInf(n, 0) || math.Trunc(n) != n || n < 0 || n > float64(1<<53-1) || (name == "datasource_id" && n == 0) {
-				return fmt.Errorf("参数 %s 必须是有效整数", name)
-			}
-		} else {
-			text, ok := value.(string)
-			if !ok || len(text) > 8192 {
-				return fmt.Errorf("参数 %s 必须是有效字符串", name)
-			}
-			kind := strings.Fields(schema)[0]
-			if strings.Contains(kind, "|") {
-				found := false
-				for _, option := range strings.Split(kind, "|") {
-					if text == option {
-						found = true
-					}
-				}
-				if !found {
-					return fmt.Errorf("参数 %s 不在允许范围", name)
-				}
+		if err := validateValue(def, value, depth+1); err != nil {
+			return fmt.Errorf("参数 %s: %w", name, err)
+		}
+		if name == "datasource_id" {
+			if n, ok := value.(float64); !ok || n <= 0 {
+				return fmt.Errorf("数据源 ID 必须是正整数")
 			}
 		}
+	}
+	return nil
+}
+func validateValue(def *schema.ParameterInfo, value interface{}, depth int) error {
+	if def == nil || depth > 16 {
+		return fmt.Errorf("参数定义无效或嵌套过深")
+	}
+	switch def.Type {
+	case schema.String:
+		text, ok := value.(string)
+		if !ok || len(text) > 8192 {
+			return fmt.Errorf("必须是有效字符串")
+		}
+		if len(def.Enum) > 0 {
+			for _, allowed := range def.Enum {
+				if text == allowed {
+					return nil
+				}
+			}
+			return fmt.Errorf("不在允许范围")
+		}
+	case schema.Integer, schema.Number:
+		n, ok := value.(float64)
+		if !ok || math.IsNaN(n) || math.IsInf(n, 0) || math.Abs(n) > float64(1<<53-1) {
+			return fmt.Errorf("必须是有效数字")
+		}
+		if def.Type == schema.Integer && math.Trunc(n) != n {
+			return fmt.Errorf("必须是整数")
+		}
+	case schema.Boolean:
+		if _, ok := value.(bool); !ok {
+			return fmt.Errorf("必须是布尔值")
+		}
+	case schema.Object:
+		values, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("必须是对象")
+		}
+		return validateObject(def.SubParams, values, depth)
+	case schema.Array:
+		values, ok := value.([]interface{})
+		if !ok || len(values) > 1000 {
+			return fmt.Errorf("必须是不超过1000项的数组")
+		}
+		for _, item := range values {
+			if err := validateValue(def.ElemInfo, item, depth+1); err != nil {
+				return err
+			}
+		}
+	default:
+		return fmt.Errorf("不支持的参数类型")
 	}
 	return nil
 }

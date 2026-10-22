@@ -78,10 +78,10 @@
       </div>
     </template>
 
-    <el-drawer v-model="drawerVisible" class="cloud-monitor-drawer" size="520px" direction="rtl" :show-close="false" :close-on-click-modal="false">
+    <el-drawer v-model="drawerVisible" class="cloud-monitor-drawer" size="min(460px, 94vw)" direction="rtl" :show-close="false" :close-on-click-modal="false">
       <template #header>
         <div class="drawer-header">
-          <el-button text :icon="ArrowLeft" class="drawer-back" @click="drawerVisible = false">返回</el-button>
+          <DrawerBackButton @click="drawerVisible = false" />
           <span class="drawer-title">{{ form.id ? '编辑云监控 Workspace' : '创建云监控 Workspace' }}</span>
         </div>
       </template>
@@ -140,6 +140,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import PageEmpty from '../../components/PageEmpty.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { ArrowLeft, Delete, Edit, InfoFilled, Loading, Plus, QuestionFilled, Refresh, Search } from '@element-plus/icons-vue'

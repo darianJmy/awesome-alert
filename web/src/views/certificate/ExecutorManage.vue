@@ -61,10 +61,10 @@
       </el-table>
     </section>
 
-    <el-drawer v-model="drawerVisible" class="node-drawer" size="680px" direction="rtl" :close-on-click-modal="false">
+    <el-drawer v-model="drawerVisible" class="node-drawer" size="min(460px, 94vw)" direction="rtl" :close-on-click-modal="false">
       <template #header>
         <div class="drawer-header">
-          <el-button text :icon="ArrowLeft" class="back-button" @click="drawerVisible = false">返回</el-button>
+          <DrawerBackButton @click="drawerVisible = false" />
           <span class="drawer-title">{{ form.id ? '编辑节点' : '创建节点' }}</span>
         </div>
       </template>
@@ -177,6 +177,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Connection, CopyDocument, Monitor, Platform, Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -665,4 +666,6 @@ function formatRelativeTime(value) {
   .type-card-list,
   .form-grid { grid-template-columns: 1fr; }
 }
+
+.form-grid { grid-template-columns:minmax(0,1fr); }
 </style>

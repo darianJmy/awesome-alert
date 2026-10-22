@@ -5,6 +5,7 @@ import (
 	"guanlan/internal/models"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,7 +13,7 @@ import (
 func ListMenus(c *gin.Context) {
 	var menus []models.Menu
 	database.DB.Order("sort ASC").Find(&menus)
-	menus = withoutRetiredChatMenus(menus)
+	menus = withoutRetiredMenus(menus)
 
 	menuMap := make(map[uint]*models.Menu)
 	for i := range menus {
@@ -122,8 +123,8 @@ func DeleteMenu(c *gin.Context) {
 
 func GetMenuOptions(c *gin.Context) {
 	var menus []models.Menu
-	database.DB.Select("id, parent_id, name, sort, type, path, component").Order("sort ASC").Find(&menus)
-	menus = withoutRetiredChatMenus(menus)
+	database.DB.Select("id, parent_id, name, sort, type, path, component, permission").Order("sort ASC").Find(&menus)
+	menus = withoutRetiredMenus(menus)
 
 	menuMap := make(map[uint]*models.Menu)
 	for i := range menus {
@@ -142,17 +143,36 @@ func GetMenuOptions(c *gin.Context) {
 }
 
 // Old installations may retain the former standalone chat menu in their database.
+// Retired navigation is hidden for existing databases without deleting role assignments.
 // Conversations remain available through the header assistant.
-func isRetiredChatMenu(menu models.Menu) bool {
-	return menu.Path == "/chat" || menu.Component == "Chat"
+func isRetiredMenu(menu models.Menu) bool {
+	return (menu.Path == "/inspection" && menu.Type == 1) || menu.Path == "/chat" || menu.Component == "Chat" || isRetiredScheduledTaskMenu(menu) ||
+		menu.Path == "/inspection/probe" || menu.Component == "inspection/InstantProbe" ||
+		menu.Path == "/settings/mcp" || menu.Component == "system/MCPServiceManage" || strings.HasPrefix(menu.Permission, "mcp-service:")
 }
 
-func withoutRetiredChatMenus(menus []models.Menu) []models.Menu {
+func withoutRetiredMenus(menus []models.Menu) []models.Menu {
 	filtered := make([]models.Menu, 0, len(menus))
 	for _, menu := range menus {
-		if !isRetiredChatMenu(menu) {
-			filtered = append(filtered, menu)
+		if !isRetiredMenu(menu) {
+			filtered = append(filtered, monitoringMenu(menu))
 		}
 	}
 	return filtered
+}
+
+func isRetiredScheduledTaskMenu(menu models.Menu) bool {
+	return menu.Path == "/automation/scheduled-tasks" || menu.Path == "/inspection/scheduled-tasks" || menu.Component == "inspection/ScheduledTaskManage" || strings.HasPrefix(menu.Permission, "task:")
+}
+
+func monitoringMenu(menu models.Menu) models.Menu {
+	if menu.Path == "/inspection/items" {
+		menu.ParentID = 0
+		menu.Name = "拨测任务"
+		menu.Sort = 6
+	}
+	if menu.Path == "/integrations/sources" || menu.Component == "monitor/IntegrationManage" {
+		menu.Name = "接入中心"
+	}
+	return menu
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"guanlan/internal/database"
@@ -209,17 +210,32 @@ func validateGitRepositoryURL(repositoryURL string) error {
 }
 
 func DeleteScript(c *gin.Context) {
-	id := c.Param("id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "脚本 ID 不正确"})
+		return
+	}
 	var taskCount int64
 	database.DB.Model(&models.AutomationTask{}).Where("source_type = ? AND script_id = ?", "script", id).Count(&taskCount)
 	if taskCount > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "脚本已被自动化任务引用，请先解除绑定"})
 		return
 	}
+	var probes []models.InspectionItem
+	if err := database.DB.Where("type = ?", "script").Find(&probes).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "检查脚本引用失败"})
+		return
+	}
+	for _, probe := range probes {
+		var config ProbeReq
+		if json.Unmarshal([]byte(probe.Config), &config) == nil && uint64(config.ScriptID) == id {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "脚本已被拨测任务引用，请先解除绑定"})
+			return
+		}
+	}
 	database.DB.Where("script_id = ?", id).Delete(&models.ScriptExecution{})
-	database.DB.Model(&models.ScheduledTask{}).Where("type = ? AND target_id = ?", "script", id).Update("status", 0)
 	database.DB.Delete(&models.Script{}, id)
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功；引用该脚本的定时任务已停用"})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "删除成功"})
 }
 
 func runScript(script models.Script) (status, output string, durationMs int64) {

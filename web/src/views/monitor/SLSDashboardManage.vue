@@ -119,10 +119,10 @@
       </div>
     </template>
 
-    <el-drawer v-model="drawerVisible" class="sls-config-drawer" size="560px" direction="rtl" :show-close="false" :close-on-click-modal="false">
+    <el-drawer v-model="drawerVisible" class="sls-config-drawer" size="min(460px, 94vw)" direction="rtl" :show-close="false" :close-on-click-modal="false">
       <template #header>
         <div class="drawer-header">
-          <el-button text :icon="ArrowLeft" class="drawer-back" @click="drawerVisible = false">返回</el-button>
+          <DrawerBackButton @click="drawerVisible = false" />
           <span class="drawer-title">{{ form.id ? '编辑日志仪表盘' : '创建日志仪表盘' }}</span>
         </div>
       </template>
@@ -240,6 +240,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import PageEmpty from '../../components/PageEmpty.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ArrowLeft, Check, Delete, Edit, InfoFilled, Loading, Plus, QuestionFilled, Refresh, Search } from '@element-plus/icons-vue'

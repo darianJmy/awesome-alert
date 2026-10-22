@@ -20,7 +20,7 @@ Go + Vue 3 · SQLite · 单二进制部署 · AI 辅助排障
 
 ## 为什么做观澜
 
-- **减少工具切换**：把数据接入、查询、告警、通知和执行记录集中到一个工作台。
+- **减少工具切换**：把监控接入、查询、告警、通知和执行记录集中到一个工作台。
 - **部署简单**：一个服务端二进制、一个 SQLite 数据库；首次启动自动建表并初始化管理员。
 - **关注运维现场**：概览展示 Prometheus 接入、Agent 探针、拨测任务和今日告警，配合告警与通知趋势图。
 - **让 AI 使用真实工具**：右上角机器人支持多轮对话和只读查询，工具调用有参数校验、权限检查和执行详情。
@@ -30,12 +30,12 @@ Go + Vue 3 · SQLite · 单二进制部署 · AI 辅助排障
 
 | 模块 | 当前能力 |
 | --- | --- |
-| 运维概览 | 4 项核心指标，告警与通知趋势，活跃告警分布、数据源类型分布，今日 / 近 7 天 / 近 30 天切换 |
-| 数据接入 | 数据源与分组管理，连接测试，Prometheus、Kubernetes、阿里云 SLS、腾讯云 CLS、Kafka、Nacos 等接入 |
+| 运维概览 | 4 项核心指标，告警与通知趋势，活跃告警分布、Prometheus 实例启用状态，今日 / 近 7 天 / 近 30 天切换 |
+| 接入中心 | Prometheus / VictoriaMetrics 多实例与分组管理，认证、自定义请求头、标签及连接测试 |
 | 指标与仪表盘 | PromQL 即时查询、范围查询、图表展示、查询历史，Grafana 及云日志仪表盘接入 |
 | 告警治理 | 规则与规则组、周期评估、故障中心、告警生命周期、静默、抑制、通知路由及告警动作 |
-| 拨测监控 | HTTP、ICMP、TCP、证书到期检测，任务分组、多节点执行、执行记录与趋势 |
-| 自动化 | 脚本、工作流、定时任务、Git 制品任务和执行记录 |
+| 拨测监控 | HTTP、ICMP、TCP、证书到期及 Shell/Python 脚本检测，任务分组、多节点执行、执行记录与趋势 |
+| 自动化 | 脚本、工作流、Git 制品任务和执行记录 |
 | 节点管理 | SSH、Agent 和 Docker 节点，远程连接与任务执行 |
 | 通知管理 | 通知渠道、模板、Webhook 发送、成功与失败记录 |
 | AI 助手 | 右侧聊天面板、会话历史、只读工具调用、运行追踪、并发与轮次限制 |
@@ -45,17 +45,11 @@ Go + Vue 3 · SQLite · 单二进制部署 · AI 辅助排障
 
 点击页面右上角的机器人，即可在当前页面打开聊天侧栏。支持查看和搜索历史会话、新建会话，以及展开模型和工具的执行详情。
 
-当前接入的只读工具包括：
+当前接入的只读工具包括 Prometheus / VictoriaMetrics 即时查询、告警查询、告警规则查询、拨测任务查询和自动化任务目录查询。
 
-- Prometheus 即时查询。
-- Kubernetes 资源查询和异常 Pod 检查。
-- SLS 日志库列表、CLS 日志检索。
-- Nacos 服务列表。
-- Kafka Topic 和消费者延迟查询。
+AI 助手采用 **Eino ReAct Agent + 原生工具调用**。在「系统设置 → AI 模型」添加多条模型连接（NewAPI、OpenAI 兼容或 Anthropic），聊天框选择模型，会话记住选择。配置存入数据库，API Key 加密保存，由后端读取，不再通过 config.yaml 或 APP_AI_* 配置。详见 [AI 助手架构](docs/architecture/ai-assistant-integration.md)。
 
-当前模型客户端使用 **Anthropic Messages 兼容协议**，请求路径为 `/v1/messages`；仅支持 OpenAI Chat Completions 的服务不能直接填入使用。模型地址、API Key 和模型名称目前通过配置文件或环境变量设置，页面中的模型管理尚未实现。
-
-工具调用由后端进行参数和权限检查，当前复用 `datasource:list` 权限及数据源分组范围。默认最多 8 轮、120 秒编排预算、4 个并发请求，同一会话一次执行一个请求。部分旧连接器仍需补齐端到端取消。资源级授权、写操作审批和自主变更不属于当前 AI 能力。
+工具调用由后端进行参数和权限检查，指标查询使用 `datasource:list` 权限及数据源分组范围，平台工具按对应模块权限校验。默认最多 8 轮、120 秒编排预算、4 个并发请求，同一会话一次执行一个请求。部分旧连接器仍需补齐端到端取消。资源级授权、写操作审批和自主变更不属于当前 AI 能力。
 
 完整设计见 [AI 助手实施方案](docs/architecture/guanlan-ai-roadmap.md)。
 
@@ -141,10 +135,6 @@ auth:
 database:
   dsn: "data/aiops.db"
 
-ai:
-  base_url: ""  # Anthropic Messages 兼容服务的基础地址
-  api_key: ""   # 也可通过 APP_AI_API_KEY 提供
-  model: "your-model-name"
 
 log:
   level: "info"
@@ -157,9 +147,6 @@ log:
 | `server.addr` | `APP_SERVER_ADDR` |
 | `auth.jwt_secret` | `APP_AUTH_JWT_SECRET` |
 | `database.dsn` | `APP_DATABASE_DSN` |
-| `ai.base_url` | `APP_AI_BASE_URL` |
-| `ai.api_key` | `APP_AI_API_KEY` |
-| `ai.model` | `APP_AI_MODEL` |
 | `log.level` | `APP_LOG_LEVEL` |
 | `log.format` | `APP_LOG_FORMAT` |
 | `log.file` | `APP_LOG_FILE` |

@@ -77,11 +77,6 @@ func seedInitialData(db *gorm.DB) error {
 		{Name: "维护 MCP 服务", Code: "mcp-service:edit", Status: 1},
 		{Name: "系统设置", Code: "system-setting:list", Status: 1},
 		{Name: "维护系统设置", Code: "system-setting:edit", Status: 1},
-		{Name: "定时任务列表", Code: "task:list", Status: 1},
-		{Name: "创建定时任务", Code: "task:create", Status: 1},
-		{Name: "编辑定时任务", Code: "task:edit", Status: 1},
-		{Name: "删除定时任务", Code: "task:delete", Status: 1},
-		{Name: "执行定时任务", Code: "task:run", Status: 1},
 	}
 	if err := db.Create(&permissions).Error; err != nil {
 		return err
@@ -98,7 +93,7 @@ func seedInitialData(db *gorm.DB) error {
 		{ID: 89, ParentID: 87, Name: "登录认证", Path: "/settings/authentication", Component: "system/AuthSetting", Icon: "Lock", Sort: 2, Type: 2, Permission: "system-setting:list", Status: 1},
 		{ID: 86, ParentID: 87, Name: "Git 认证", Path: "/settings/git-credentials", Component: "system/GitCredentialManage", Icon: "Key", Sort: 3, Type: 2, Permission: "git-credential:list", Status: 1},
 		{ID: 90, ParentID: 87, Name: "访问令牌", Path: "/settings/api-tokens", Component: "system/APITokenManage", Icon: "Key", Sort: 4, Type: 2, Permission: "api-token:list", Status: 1},
-		{ID: 92, ParentID: 87, Name: "MCP 服务", Path: "/settings/mcp", Component: "system/MCPServiceManage", Icon: "Connection", Sort: 5, Type: 2, Permission: "mcp-service:list", Status: 1},
+		{ID: 93, ParentID: 87, Name: "AI 模型", Path: "/settings/ai-models", Component: "system/AIModelManage", Icon: "Cpu", Sort: 6, Type: 2, Permission: "system-setting:list", Status: 1},
 		{ID: 7, ParentID: 0, Name: "接入中心", Path: "/integrations/sources", Component: "monitor/IntegrationManage", Icon: "Connection", Sort: 10, Type: 2, Permission: "datasource:list", Status: 1},
 		{ID: 8, ParentID: 0, Name: "仪表盘", Path: "/dashboards", Component: "", Icon: "DataAnalysis", Sort: 1, Type: 1, Status: 1},
 		{ID: 84, ParentID: 8, Name: "监控仪表盘", Path: "/dashboards/grafana", Component: "monitor/GrafanaDashboardManage", Icon: "DataAnalysis", Sort: 1, Type: 2, Permission: "dashboard:list", Status: 1},
@@ -106,14 +101,12 @@ func seedInitialData(db *gorm.DB) error {
 		{ID: 91, ParentID: 8, Name: "云监控2.0", Path: "/dashboards/cloud-monitor", Component: "monitor/CloudMonitorDashboardManage", Icon: "Cloudy", Sort: 3, Type: 2, Permission: "dashboard:list", Status: 1},
 		{ID: 38, ParentID: 0, Name: "告警中心", Path: "/alert-center", Component: "", Icon: "Bell", Sort: 4, Type: 1, Status: 1},
 		{ID: 19, ParentID: 38, Name: "即时查询", Path: "/monitor/query", Component: "monitor/InstantQuery", Icon: "Search", Sort: 2, Type: 2, Status: 1},
-		{ID: 9, ParentID: 0, Name: "拨测中心", Path: "/inspection", Component: "", Icon: "AlarmClock", Sort: 6, Type: 1, Status: 1},
-		{ID: 10, ParentID: 9, Name: "即时拨测", Path: "/inspection/probe", Component: "inspection/InstantProbe", Icon: "Connection", Sort: 1, Type: 2, Status: 1},
-		{ID: 11, ParentID: 9, Name: "拨测任务", Path: "/inspection/items", Component: "inspection/InspectionManage", Icon: "Checked", Sort: 2, Type: 2, Permission: "inspection:list", Status: 1},
+		{ID: 9, ParentID: 0, Name: "拨测中心", Path: "/inspection", Component: "", Icon: "AlarmClock", Sort: 6, Type: 1, Status: 0},
+		{ID: 11, ParentID: 0, Name: "拨测任务", Path: "/inspection/items", Component: "inspection/InspectionManage", Icon: "Checked", Sort: 6, Type: 2, Permission: "inspection:list", Status: 1},
 		{ID: 15, ParentID: 0, Name: "自动化中心", Path: "/automation", Component: "", Icon: "Operation", Sort: 7, Type: 1, Status: 1},
 		{ID: 24, ParentID: 87, Name: "节点管理", Path: "/nodes", Component: "certificate/ExecutorManage", Icon: "Monitor", Sort: 5, Type: 2, Permission: "certificate:executor:list", Status: 1},
 		{ID: 12, ParentID: 15, Name: "脚本库", Path: "/automation/scripts", Component: "automation/ScriptLibrary", Icon: "Document", Sort: 2, Type: 2, Status: 1},
 		{ID: 13, ParentID: 15, Name: "自动化任务", Path: "/automation/tasks", Component: "automation/AutomationTaskManage", Icon: "SetUp", Sort: 3, Type: 2, Permission: "automation-task:list", Status: 1},
-		{ID: 18, ParentID: 15, Name: "定时任务", Path: "/automation/scheduled-tasks", Component: "inspection/ScheduledTaskManage", Icon: "Timer", Sort: 4, Type: 2, Permission: "task:list", Status: 1},
 		{ID: 14, ParentID: 15, Name: "执行记录", Path: "/automation/records", Component: "inspection/ExecutionRecords", Icon: "Tickets", Sort: 5, Type: 2, Status: 1},
 	}
 	if err := db.Create(&menus).Error; err != nil {
@@ -197,7 +190,6 @@ func applyInitialRoadmapData(db *gorm.DB) error {
 		{ID: 89, ParentID: 87, Name: "登录认证", Path: "/settings/authentication", Component: "system/AuthSetting", Icon: "Lock", Sort: 2, Type: 2, Permission: "system-setting:list", Status: 1},
 		{ID: 86, ParentID: 87, Name: "Git 认证", Path: "/settings/git-credentials", Component: "system/GitCredentialManage", Icon: "Key", Sort: 3, Type: 2, Permission: "git-credential:list", Status: 1},
 		{ID: 90, ParentID: 87, Name: "访问令牌", Path: "/settings/api-tokens", Component: "system/APITokenManage", Icon: "Key", Sort: 4, Type: 2, Permission: "api-token:list", Status: 1},
-		{ID: 92, ParentID: 87, Name: "MCP 服务", Path: "/settings/mcp", Component: "system/MCPServiceManage", Icon: "Connection", Sort: 5, Type: 2, Permission: "mcp-service:list", Status: 1},
 		{ID: 30, ParentID: 0, Name: "可观测中心", Path: "/observability", Component: "", Icon: "DataLine", Sort: 5, Type: 1, Status: 1},
 		{ID: 31, ParentID: 30, Name: "日志查询", Path: "/observability/logs", Component: "common/FeaturePlaceholder", Icon: "Document", Sort: 1, Type: 2, Permission: "observability:logs", Status: 1},
 		{ID: 32, ParentID: 30, Name: "链路追踪", Path: "/observability/traces", Component: "common/FeaturePlaceholder", Icon: "Share", Sort: 2, Type: 2, Permission: "observability:traces", Status: 1},
@@ -230,12 +222,6 @@ func applyInitialRoadmapData(db *gorm.DB) error {
 	if err := db.Model(&models.Menu{}).Where("id = ?", 90).Updates(map[string]interface{}{
 		"parent_id": 87, "name": "访问令牌", "path": "/settings/api-tokens", "component": "system/APITokenManage",
 		"icon": "Key", "sort": 4, "type": 2, "permission": "api-token:list", "status": 1,
-	}).Error; err != nil {
-		return err
-	}
-	if err := db.Model(&models.Menu{}).Where("id = ?", 92).Updates(map[string]interface{}{
-		"parent_id": 87, "name": "MCP 服务", "path": "/settings/mcp", "component": "system/MCPServiceManage",
-		"icon": "Connection", "sort": 5, "type": 2, "permission": "mcp-service:list", "status": 1,
 	}).Error; err != nil {
 		return err
 	}
@@ -477,16 +463,14 @@ func applyInitialRoadmapData(db *gorm.DB) error {
 	}).Error; err != nil {
 		return err
 	}
-	if err := db.Model(&models.Menu{}).Where("id = ?", 18).Updates(map[string]interface{}{"parent_id": 15, "path": "/automation/scheduled-tasks", "sort": 4}).Error; err != nil {
-		return err
-	}
+
 	if err := db.Model(&models.Menu{}).Where("id = ?", 14).Updates(map[string]interface{}{"parent_id": 15, "name": "执行记录", "path": "/automation/records", "sort": 5}).Error; err != nil {
 		return err
 	}
-	if err := db.Model(&models.Menu{}).Where("id = ?", 9).Updates(map[string]interface{}{"name": "拨测中心", "sort": 6}).Error; err != nil {
+	if err := db.Model(&models.Menu{}).Where("id = ?", 9).Updates(map[string]interface{}{"status": 0}).Error; err != nil {
 		return err
 	}
-	if err := db.Model(&models.Menu{}).Where("id = ?", 11).Updates(map[string]interface{}{"name": "拨测任务", "sort": 2}).Error; err != nil {
+	if err := db.Model(&models.Menu{}).Where("id = ?", 11).Updates(map[string]interface{}{"parent_id": 0, "name": "拨测任务", "sort": 6}).Error; err != nil {
 		return err
 	}
 	if err := db.Exec("DELETE FROM role_menus WHERE menu_id = ?", 28).Error; err != nil {
@@ -791,7 +775,7 @@ func ensureFaultCenters(db *gorm.DB) error {
 
 func datasourceCategoryByType(dsType string) string {
 	switch dsType {
-	case "prometheus", "loki", "elasticsearch", "jaeger", "opentelemetry", "sls", "cls", "trace":
+	case "prometheus", "victoriametrics", "loki", "elasticsearch", "jaeger", "opentelemetry", "sls", "cls", "trace":
 		return "observability"
 	case "mysql", "clickhouse", "postgresql", "redis", "influxdb":
 		return "database"

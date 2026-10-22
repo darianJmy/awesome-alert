@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func ListTunnels(c *gin.Context) {
@@ -44,9 +45,6 @@ func CreateTunnel(c *gin.Context) {
 	}
 	if req.AuthType == "" {
 		req.AuthType = "password"
-	}
-	if req.Status == 0 {
-		req.Status = 1
 	}
 
 	t := models.Tunnel{
@@ -163,7 +161,7 @@ func ListDatasourcesWithTunnel(c *gin.Context) {
 
 	var total int64
 	var datasources []models.Datasource
-	tx := database.DB.Model(&models.Datasource{})
+	tx := database.DB.Model(&models.Datasource{}).Where("type IN ?", supportedDatasourceTypes())
 	if query.Category != "" {
 		tx = tx.Where("category = ?", query.Category)
 	}
@@ -276,7 +274,7 @@ type CreateDatasourceWithTunnelReq struct {
 }
 
 func CreateDatasourceWithTunnel(c *gin.Context) {
-	var req CreateDatasourceWithTunnelReq
+	req := CreateDatasourceWithTunnelReq{Status: 1}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
 		return
@@ -291,17 +289,22 @@ func UpdateDatasourceWithTunnel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
 		return
 	}
+	var existing models.Datasource
+	if id < 1 || database.DB.Where("type IN ?", supportedDatasourceTypes()).First(&existing, id).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "数据源实例不存在"})
+		return
+	}
+	if err := normalizeDatasourceReq(&req, &existing); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+
 	labels, err := normalizeDatasourceLabels(req.Labels)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
 		return
 	}
 	req.Labels = labels
-	if req.Type == "k8s" && strings.TrimSpace(req.URL) == "" {
-		if endpoint := k8sEndpointFromAuthConfig(req.AuthConfig); endpoint != "" {
-			req.URL = endpoint
-		}
-	}
 
 	updates := map[string]interface{}{
 		"name":         req.Name,
@@ -319,12 +322,13 @@ func UpdateDatasourceWithTunnel(c *gin.Context) {
 		"tunnel_id":    req.TunnelID,
 		"status":       req.Status,
 		"remark":       req.Remark,
-	}
-	if strings.TrimSpace(req.AuthConfig) != "" {
-		updates["auth_config"] = req.AuthConfig
+		"auth_config":  req.AuthConfig,
 	}
 
-	database.DB.Model(&models.Datasource{}).Where("id = ?", id).Updates(updates)
+	if err := database.DB.Model(&existing).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新实例失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "更新成功"})
 }
 
@@ -343,6 +347,10 @@ func BatchUpdateDatasourceStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请选择接入并指定正确状态"})
 		return
 	}
+	if !requireSupportedDatasourceIDs(c, req.IDs) {
+		return
+	}
+
 	result := database.DB.Model(&models.Datasource{}).Where("id IN ?", req.IDs).Update("status", *req.Status)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "批量更新状态失败"})
@@ -357,10 +365,17 @@ func BatchDeleteDatasources(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请选择要删除的接入"})
 		return
 	}
+	if !requireSupportedDatasourceIDs(c, req.IDs) {
+		return
+	}
+
 	var groupCount int64
 	database.DB.Model(&models.DatasourceGroupMember{}).Where("datasource_id IN ?", req.IDs).Count(&groupCount)
 	if groupCount > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "所选接入仍属于数据源分组，请先从数据源分组移除"})
+		return
+	}
+	if !requireUnboundDatasources(c, req.IDs) {
 		return
 	}
 	result := database.DB.Where("id IN ?", req.IDs).Delete(&models.Datasource{})
@@ -372,6 +387,11 @@ func BatchDeleteDatasources(c *gin.Context) {
 }
 
 func buildAndCreateDatasource(req CreateDatasourceWithTunnelReq, c *gin.Context) {
+	if err := normalizeDatasourceReq(&req, nil); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+
 	labels, err := normalizeDatasourceLabels(req.Labels)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
@@ -383,14 +403,6 @@ func buildAndCreateDatasource(req CreateDatasourceWithTunnelReq, c *gin.Context)
 	}
 	if req.Category == "" {
 		req.Category = categoryByType(req.Type)
-	}
-	if req.Status == 0 {
-		req.Status = 1
-	}
-	if req.Type == "k8s" && strings.TrimSpace(req.URL) == "" {
-		if endpoint := k8sEndpointFromAuthConfig(req.AuthConfig); endpoint != "" {
-			req.URL = endpoint
-		}
 	}
 
 	ds := models.Datasource{
@@ -411,7 +423,15 @@ func buildAndCreateDatasource(req CreateDatasourceWithTunnelReq, c *gin.Context)
 		Status:       req.Status,
 		Remark:       req.Remark,
 	}
-	database.DB.Create(&ds)
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&ds).Error; err != nil {
+			return err
+		}
+		return tx.Model(&ds).Update("status", req.Status).Error
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建实例失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
 }
 
@@ -433,7 +453,7 @@ type DatasourceAuthConfig struct {
 func GetDatasourceAuth(c *gin.Context) {
 	id := c.Param("id")
 	var ds models.Datasource
-	if err := database.DB.First(&ds, id).Error; err != nil {
+	if err := database.DB.Where("type IN ?", supportedDatasourceTypes()).First(&ds, id).Error; err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": 404, "message": "数据源不存在"})
 		return
 	}

@@ -1,6 +1,21 @@
 <template>
   <div class="task-page">
-    <div class="group-heading"><el-button text @click="router.push('/inspection/items')">返回规则组</el-button><strong>{{ group?.name || '拨测规则组' }}</strong><span>{{ group?.description }}</span></div>
+    <header class="detail-header">
+      <el-button link type="primary" :icon="ArrowLeft" @click="router.push('/inspection/items')">返回</el-button>
+      <div class="group-summary">
+        <div class="group-name">
+          <template v-if="nameEditing">
+            <el-input ref="nameInputRef" v-model="nameDraft" class="group-name-input" size="small" maxlength="128" aria-label="拨测规则组名称" :disabled="nameSaving" @keyup.enter="saveGroupName" @keyup.esc="cancelNameEdit" />
+            <el-tooltip content="确认" placement="top"><el-button text circle class="name-action is-confirm" :icon="Check" :loading="nameSaving" aria-label="保存拨测规则组名称" @click="saveGroupName" /></el-tooltip>
+            <el-tooltip content="取消" placement="top"><el-button text circle class="name-action is-cancel" :icon="Close" :disabled="nameSaving" aria-label="取消修改拨测规则组名称" @click="cancelNameEdit" /></el-tooltip>
+          </template>
+          <template v-else>
+            <p :title="group?.name">{{ group?.name || '拨测规则组' }}</p>
+            <el-tooltip v-if="group" content="编辑名称" placement="top"><el-button text circle :icon="Edit" aria-label="编辑拨测规则组名称" @click="startNameEdit" v-permission="['inspection:edit']" /></el-tooltip>
+          </template>
+        </div>
+      </div>
+    </header>
     <header class="task-toolbar">
       <div class="filter-bar" role="search" aria-label="拨测任务搜索">
         <el-input v-model="filters.keyword" class="task-search" :prefix-icon="Search" clearable aria-label="搜索拨测任务" placeholder="搜索名称、目标或标签" @input="handleKeywordInput" @keyup.enter="handleSearch" @clear="handleSearch" />
@@ -103,7 +118,8 @@
       </template>
     </el-dialog>
 
-    <el-drawer v-model="drawerVisible" class="probe-task-drawer" :title="isEdit ? '编辑拨测任务' : '新建拨测任务'" size="min(860px, 94vw)" :close-on-click-modal="false">
+    <el-drawer v-model="drawerVisible" class="probe-task-drawer" :title="isEdit ? '编辑拨测任务' : '新建拨测任务'" size="min(460px, 94vw)" :close-on-click-modal="false">
+      <template #header><div class="standard-drawer-header"><DrawerBackButton @click="drawerVisible = false" /><span class="standard-drawer-title">{{ isEdit ? '编辑拨测任务' : '新建拨测任务' }}</span></div></template>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="task-form">
         <section class="form-section">
           <div class="section-title"><strong>基本配置</strong><span>定义任务名称和拨测类型</span></div>
@@ -176,11 +192,13 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElButton, ElInput, ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Delete, Download, Edit, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
-import { getInspectionRuleGroup, getInspectionItems, createInspectionItem, updateInspectionItem, deleteInspectionItem, batchDeleteInspectionItems, batchUpdateInspectionItemStatus, exportInspectionItems, importInspectionItems } from '../../api/inspection'
+import { ArrowDown, ArrowLeft, Check, Close, Delete, Download, Edit, Plus, Refresh, Search, Upload } from '@element-plus/icons-vue'
+import { updateInspectionRuleGroup, getInspectionRuleGroup, getInspectionItems, createInspectionItem, updateInspectionItem, deleteInspectionItem, batchDeleteInspectionItems, batchUpdateInspectionItemStatus, exportInspectionItems, importInspectionItems } from '../../api/inspection'
+import { probeTypes } from '../../utils/probeTypes'
 import { getAgents, getCertificateExecutors } from '../../api/certificate'
 import { getFaultCenters } from '../../api/alert'
 import { isDockerAgent } from '../../utils/agentNode'
@@ -195,12 +213,7 @@ const KeyValueEditor = defineComponent({
   },
 })
 
-const taskTypes = [
-  { value: 'http', label: 'HTTP', title: '应用请求', description: '接口与网页可用性', hint: '配置请求地址、方法和成功状态码', defaultPort: 0 },
-  { value: 'icmp', label: 'ICMP', title: '网络连通', description: '检查主机是否可达', hint: '配置目标主机和 ICMP 发包数量', defaultPort: 0 },
-  { value: 'tcp', label: 'TCP', title: '端口连通', description: '检查服务端口开放', hint: '配置目标主机和 TCP 端口', defaultPort: 80 },
-  { value: 'certificate_expiry', label: '证书到期', title: '有效期检查', description: '在网站证书到期前告警', hint: '检查网站证书的剩余有效期', defaultPort: 443 },
-]
+const taskTypes = probeTypes
 const intervals = [{ label: '每 30 秒', value: 30 }, { label: '每 1 分钟', value: 60 }, { label: '每 5 分钟', value: 300 }, { label: '每 10 分钟', value: 600 }, { label: '每 30 分钟', value: 1800 }, { label: '每 1 小时', value: 3600 }, { label: '每 6 小时', value: 21600 }, { label: '每 24 小时', value: 86400 }]
 const httpMethods = ['GET', 'POST', 'PUT', 'DELETE']
 const defaultForm = (type = 'http') => ({ id: null, name: '', type, target: '', host: '', port: taskTypes.find(item => item.value === type)?.defaultPort || 80, method: 'GET', headers: [{ key: '', value: '' }], params: [{ key: '', value: '' }], body: '', timeout_ms: 10000, content_type: 'application/json', auth_type: 'none', username: '', password: '', success_codes: '200-399', count: 4, server_name: '', node_value: 'direct', interval_seconds: 300, failure_threshold: 3, fault_center_id: null, status: 1 })
@@ -208,6 +221,30 @@ const defaultForm = (type = 'http') => ({ id: null, name: '', type, target: '', 
 const loading = ref(false), saving = ref(false), drawerVisible = ref(false), isEdit = ref(false), formRef = ref()
 const router = useRouter(), route = useRoute(), group = ref(null)
 const groupId = computed(() => Number(route.params.groupId))
+const nameEditing = ref(false), nameSaving = ref(false), nameDraft = ref(''), nameInputRef = ref()
+async function startNameEdit() {
+  if (!group.value) return
+  nameDraft.value = group.value.name
+  nameEditing.value = true
+  await nextTick()
+  nameInputRef.value?.focus()
+  nameInputRef.value?.select()
+}
+function cancelNameEdit() { if (!nameSaving.value) nameEditing.value = false }
+async function saveGroupName() {
+  if (nameSaving.value || !group.value) return
+  const name = nameDraft.value.trim()
+  if (!name) { ElMessage.warning('请输入拨测规则组名称'); return }
+  if (name === group.value.name) { nameEditing.value = false; return }
+  nameSaving.value = true
+  try {
+    await updateInspectionRuleGroup(groupId.value, { name, description: group.value.description || '' })
+    group.value = { ...group.value, name }
+    nameEditing.value = false
+    ElMessage.success('名称已更新')
+  } finally { nameSaving.value = false }
+}
+
 const tableData = ref([]), selectedRows = ref([]), batchAction = ref(''), togglingId = ref(null), total = ref(0), page = ref(1), pageSize = ref(20), sshNodes = ref([]), agentNodes = ref([]), faultCenters = ref([]), form = reactive(defaultForm())
 const hostAgentNodes = computed(() => agentNodes.value.filter(item => !isDockerAgent(item)))
 const dockerAgentNodes = computed(() => agentNodes.value.filter(isDockerAgent))
@@ -420,13 +457,21 @@ function formatShortTime(value) { const date = new Date(value); return Number.is
 </script>
 
 <style scoped>
-.group-heading{display:flex;align-items:center;gap:12px}.group-heading span{color:var(--ops-muted);font-size:12px}
+.detail-header { display:flex; min-height:32px; align-items:center; gap:14px; }
+.group-summary { min-width:0; flex:1; }
+.group-name { display:flex; min-width:0; align-items:center; gap:4px; }
+.group-name p { margin:0; overflow:hidden; color:var(--ops-muted,#7f8da0); font-size:12px; font-weight:400; line-height:1.5; text-overflow:ellipsis; white-space:nowrap; }
+.group-name-input { width:140px; max-width:calc(100vw - 210px); }
+.group-summary .el-button { width:26px; height:26px; margin:0; padding:4px; color:#8c9aad; }
+.group-summary .el-button:hover { color:#1769d2; background:#eef5ff; }
+.group-summary .name-action.is-confirm { color:#1a8f68; }
+.group-summary .name-action.is-cancel { color:#c55252; }
 
 .task-page { --ink: #17233b; --muted: #758399; --border: #e1e8f1; display: flex; flex-direction: column; gap: 16px; }
 .task-hero { display: flex; align-items: center; gap: 16px; min-height: 92px; padding: 20px 24px; background: linear-gradient(115deg, #fff 0%, #f6f9fe 60%, #edf5ff 100%); border: 1px solid #dce7f6; border-radius: 10px; box-shadow: 0 8px 28px rgba(35, 78, 134, .06); }
 .hero-icon { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; flex: 0 0 48px; color: #fff; background: linear-gradient(145deg, #2478e8, #0f5bc6); border-radius: 12px; box-shadow: 0 8px 18px rgba(23, 105, 224, .22); font-size: 24px; }
 .hero-copy { margin-right: auto; }.hero-copy h1 { margin: 0; color: var(--ink); font-size: 22px; font-weight: 750; }.hero-copy p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }.hero-actions { display: flex; gap: 10px; }
-.task-card { border-color: var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(31, 50, 81, .045); }.task-card :deep(.el-card__body) { padding: 16px; }
+.task-card { border-color: var(--border); border-radius: 7px; box-shadow: none; }.task-card :deep(.el-card__body) { padding: 16px; }
 .task-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
 .filter-bar { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; }
 .task-search { width: 220px; }
@@ -479,6 +524,11 @@ function formatShortTime(value) { const date = new Date(value); return Number.is
   .task-toolbar .task-search { grid-column: 1 / -1; }
   .task-toolbar .page-header-actions { justify-content: flex-end; }
 }
+
+.probe-task-drawer .probe-types { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.probe-task-drawer .form-grid,.probe-task-drawer .schedule-grid,.probe-task-drawer .execution-panel { grid-template-columns:minmax(0,1fr); gap:12px; }
+.probe-task-drawer .full-row { grid-column:auto; }
+.probe-task-drawer .section-title { flex-wrap:wrap; }
 </style>
 
 <style>
@@ -529,4 +579,9 @@ function formatShortTime(value) { const date = new Date(value); return Number.is
 @media (prefers-reduced-motion:reduce) { .probe-task-drawer .type-card { transition: none; } }
 @media (max-width:900px) { .probe-task-drawer .probe-types { grid-template-columns: repeat(3,minmax(0,1fr)); } .probe-task-drawer .schedule-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width:700px) { .probe-task-drawer .probe-types,.probe-task-drawer .form-grid,.probe-task-drawer .schedule-grid { grid-template-columns: 1fr; } .probe-task-drawer .execution-panel { grid-template-columns: 1fr; gap: 12px; } .probe-task-drawer .full-row { grid-column: auto; } }
+
+.probe-task-drawer .probe-types { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.probe-task-drawer .form-grid,.probe-task-drawer .schedule-grid,.probe-task-drawer .execution-panel { grid-template-columns:minmax(0,1fr); gap:12px; }
+.probe-task-drawer .full-row { grid-column:auto; }
+.probe-task-drawer .section-title { flex-wrap:wrap; }
 </style>

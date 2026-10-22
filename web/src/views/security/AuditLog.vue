@@ -34,6 +34,7 @@
     </el-card>
 
     <el-drawer v-model="detailVisible" title="操作审计详情" size="640px" class="audit-drawer">
+      <template #header><div class="standard-drawer-header"><DrawerBackButton @click="detailVisible = false" /><span class="standard-drawer-title">操作审计详情</span></div></template>
       <div v-if="current" class="detail-body">
         <div class="detail-status"><div><span>{{ current.action }}</span><strong>{{ current.module }} · {{ current.resource_name || resourceText(current.resource_type) }}</strong></div><el-tag :type="current.result === '成功' ? 'success' : 'danger'">{{ current.result }}</el-tag></div>
         <dl>
@@ -51,6 +52,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { Refresh, Search, View } from '@element-plus/icons-vue'
 import { getAuditLogs, getAuditLogStats } from '../../api/audit'

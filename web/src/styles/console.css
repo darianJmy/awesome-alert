@@ -221,3 +221,16 @@ body {
     width: 100% !important;
   }
 }
+
+/* Shared layout for drawer headings with a back control. */
+.standard-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.standard-drawer-title {
+  color: var(--ops-text);
+  font-size: 16px;
+  font-weight: 600;
+}

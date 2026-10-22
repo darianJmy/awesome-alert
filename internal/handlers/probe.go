@@ -25,6 +25,7 @@ import (
 const probeMetaMarker = "\n__AIOPS_PROBE_META__:"
 
 type ProbeReq struct {
+	ScriptID        uint              `json:"script_id"`
 	ExpiryAlertDays *int              `json:"expiry_alert_days"`
 	Type            string            `json:"type" binding:"required"`
 	Target          string            `json:"target"`
@@ -92,8 +93,19 @@ func InstantProbe(c *gin.Context) {
 		return
 	}
 	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
-	if req.Type != "http" && req.Type != "icmp" && req.Type != "tcp" && req.Type != "certificate_expiry" {
+	if req.Type != "http" && req.Type != "icmp" && req.Type != "tcp" && req.Type != "certificate_expiry" && req.Type != "script" {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "不支持的拨测类型"})
+		return
+	}
+	if req.Type == "script" {
+		if _, err := loadProbeScript(req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			return
+		}
+		status, result, duration := executeScriptProbe(req)
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "拨测完成", "data": gin.H{
+			"status": status, "probe_type": "script", "duration_ms": duration, "result": result,
+		}})
 		return
 	}
 	if req.Type != "http" {

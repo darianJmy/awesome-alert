@@ -42,10 +42,10 @@
       <div v-if="filteredTemplates.length > 0" class="task-pagination"><el-pagination v-model:current-page="page" v-model:page-size="pageSize" :total="filteredTemplates.length" :page-sizes="[10, 20, 50, 100]" layout="total, sizes, prev, pager, next" /></div>
     </el-card>
 
-    <el-drawer v-model="drawerVisible" class="template-drawer" size="920px" direction="rtl" :close-on-click-modal="false">
+    <el-drawer v-model="drawerVisible" class="template-drawer" size="min(460px, 94vw)" direction="rtl" :close-on-click-modal="false">
       <template #header>
         <div class="drawer-header">
-          <el-button text :icon="ArrowLeft" class="back-button" @click="drawerVisible = false">返回</el-button>
+          <DrawerBackButton @click="drawerVisible = false" />
           <span class="drawer-title">{{ form.id ? '编辑通知模板' : '创建通知模板' }}</span>
         </div>
       </template>
@@ -114,6 +114,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Delete, Edit, InfoFilled, Plus, QuestionFilled, Refresh, Search } from '@element-plus/icons-vue'
@@ -605,4 +606,9 @@ function formatTime(value) {
 }
 
 @media (max-width: 560px) { .task-toolbar { flex-direction: column; }.filter-bar { grid-template-columns: 1fr 1fr; }.task-search { grid-column: 1 / -1; }.page-header-actions { justify-content: flex-end; } }
+
+.form-row,.field-grid { grid-template-columns:minmax(0,1fr); }
+.template-notice { align-items:flex-start; flex-wrap:wrap; }
+.intro-message { overflow:visible; white-space:normal; }
+.color-legend { width:100%; padding-left:23px; }
 </style>

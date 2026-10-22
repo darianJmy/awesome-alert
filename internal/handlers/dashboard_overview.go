@@ -24,6 +24,7 @@ type overviewPoint struct {
 }
 
 type overviewSummary struct {
+	DatasourcesEnabled        int64 `json:"datasources_enabled"`
 	Prometheus                int64 `json:"prometheus"`
 	PrometheusEnabled         int64 `json:"prometheus_enabled"`
 	ProbeAgents               int64 `json:"probe_agents"`
@@ -108,7 +109,6 @@ func loadDashboardOverview(db *gorm.DB, now time.Time, rangeKey string) (dashboa
 		count *int64
 	}{
 		{&models.DatasourceGroup{}, &out.Summary.DataCenters},
-		{&models.Datasource{}, &out.Summary.Datasources},
 		{&models.FaultCenter{}, &out.Summary.FaultCenters},
 	} {
 		if err := db.Model(item.model).Count(item.count).Error; err != nil {
@@ -122,12 +122,14 @@ func loadDashboardOverview(db *gorm.DB, now time.Time, rangeKey string) (dashboa
 	bounded := func(q *gorm.DB, from time.Time) *gorm.DB {
 		return q.Where("julianday(created_at) >= julianday(?) AND julianday(created_at) <= julianday(?)", from, now)
 	}
-	probeTypes := []string{"http", "icmp", "tcp", "certificate_expiry"}
+	probeTypes := []string{"http", "icmp", "tcp", "certificate_expiry", "script"}
 	for _, item := range []struct {
 		query *gorm.DB
 		count *int64
 	}{
 		{db.Model(&models.Datasource{}).Where("type = ?", "prometheus"), &out.Summary.Prometheus},
+		{db.Model(&models.Datasource{}).Where("type IN ?", supportedDatasourceTypes()), &out.Summary.Datasources},
+		{db.Model(&models.Datasource{}).Where("type IN ? AND status = 1", supportedDatasourceTypes()), &out.Summary.DatasourcesEnabled},
 		{db.Model(&models.Datasource{}).Where("type = ? AND status = 1", "prometheus"), &out.Summary.PrometheusEnabled},
 		{db.Model(&models.AgentConnection{}).Where("status <> ?", "deleted"), &out.Summary.ProbeAgents},
 		{db.Model(&models.AgentConnection{}).Where("status = ? AND julianday(last_seen_at) >= julianday(?) AND julianday(last_seen_at) <= julianday(?)", "online", now.Add(-2*time.Minute), now), &out.Summary.ProbeAgentsOnline},
@@ -156,7 +158,7 @@ func loadDashboardOverview(db *gorm.DB, now time.Time, rangeKey string) (dashboa
 	for _, row := range out.Severity {
 		out.Summary.ActiveAlerts += row.Count
 	}
-	if err := db.Model(&models.Datasource{}).Select("type AS name, COUNT(*) AS count").Group("type").Order("count DESC, type ASC").Scan(&out.DatasourceTypes).Error; err != nil {
+	if err := db.Model(&models.Datasource{}).Where("type IN ?", supportedDatasourceTypes()).Select("type AS name, COUNT(*) AS count").Group("type").Order("count DESC, type ASC").Scan(&out.DatasourceTypes).Error; err != nil {
 		return out, err
 	}
 	bucket := "strftime('" + format + "', created_at, '+8 hours')"

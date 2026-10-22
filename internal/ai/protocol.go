@@ -1,6 +1,9 @@
 package ai
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"github.com/cloudwego/eino/schema"
+)
 
 type RiskLevel string
 
@@ -10,19 +13,14 @@ const (
 	RiskWriteConfirm      RiskLevel = "write_requires_confirmation"
 )
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 type ToolSpec struct {
-	Name           string                 `json:"name"`
-	Description    string                 `json:"description"`
-	DatasourceType string                 `json:"datasource_type,omitempty"`
-	Risk           RiskLevel              `json:"risk"`
-	ParamsSchema   map[string]interface{} `json:"params_schema"`
-	MaxTimeRange   string                 `json:"max_time_range,omitempty"`
-	TimeoutSeconds int                    `json:"timeout_seconds,omitempty"`
+	Name           string                           `json:"name"`
+	Description    string                           `json:"description"`
+	DatasourceType string                           `json:"datasource_type,omitempty"`
+	Risk           RiskLevel                        `json:"risk"`
+	ParamsSchema   map[string]*schema.ParameterInfo `json:"params_schema"`
+	MaxTimeRange   string                           `json:"max_time_range,omitempty"`
+	TimeoutSeconds int                              `json:"timeout_seconds,omitempty"`
 }
 
 type ToolCall struct {
@@ -39,14 +37,6 @@ type ToolResult struct {
 	Message   string                 `json:"message,omitempty"`
 	Retryable bool                   `json:"retryable,omitempty"`
 	Meta      map[string]interface{} `json:"meta,omitempty"`
-}
-
-type ModelResponse struct {
-	Type   string                 `json:"type"`
-	Answer string                 `json:"answer,omitempty"`
-	Tool   string                 `json:"tool,omitempty"`
-	Params map[string]interface{} `json:"params,omitempty"`
-	Reason string                 `json:"reason,omitempty"`
 }
 
 func MarshalJSONCompact(value interface{}) string {

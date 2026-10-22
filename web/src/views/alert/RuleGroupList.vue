@@ -50,8 +50,8 @@
       </div>
     </section>
 
-    <el-drawer v-model="drawerVisible" class="group-drawer" size="min(520px, 94vw)" :close-on-click-modal="false" destroy-on-close>
-      <template #header><div class="drawer-header"><el-button text :icon="ArrowLeft" @click="drawerVisible = false">返回</el-button><strong>{{ form.id ? '编辑规则组' : '创建规则组' }}</strong></div></template>
+    <el-drawer v-model="drawerVisible" class="group-drawer" size="min(460px, 94vw)" :close-on-click-modal="false" destroy-on-close>
+      <template #header><div class="drawer-header"><DrawerBackButton @click="drawerVisible = false" /><strong>{{ form.id ? '编辑规则组' : '创建规则组' }}</strong></div></template>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <el-form-item label="规则组名称" prop="name"><el-input v-model="form.name" maxlength="128" show-word-limit /></el-form-item>
         <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="5" maxlength="500" show-word-limit /></el-form-item>
@@ -63,6 +63,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'

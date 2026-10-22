@@ -52,10 +52,10 @@
 
     <PageEmpty v-if="!loading && filteredCenters.length === 0" :description="centers.length ? '没有符合条件的故障中心' : '暂无故障中心'" />
 
-    <el-drawer v-model="centerDrawerVisible" class="center-drawer" size="480px" direction="rtl" :close-on-click-modal="false" destroy-on-close>
+    <el-drawer v-model="centerDrawerVisible" class="center-drawer" size="min(460px, 94vw)" direction="rtl" :close-on-click-modal="false" destroy-on-close>
       <template #header>
         <div class="drawer-header">
-          <el-button text :icon="ArrowLeft" class="back-button" @click="centerDrawerVisible = false">返回</el-button>
+          <DrawerBackButton @click="centerDrawerVisible = false" />
           <span class="drawer-title">{{ centerForm.id ? '编辑故障中心' : '创建故障中心' }}</span>
         </div>
       </template>
@@ -79,6 +79,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import PageEmpty from '../../components/PageEmpty.vue'
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'

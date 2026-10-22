@@ -31,6 +31,13 @@ func freshSQLite(t *testing.T) *gorm.DB {
 
 func TestSQLiteInitializationAndReopen(t *testing.T) {
 	db := freshSQLite(t)
+	var mcpMenus int64
+	if err := db.Model(&models.Menu{}).Where("path = ? OR component = ?", "/settings/mcp", "system/MCPServiceManage").Count(&mcpMenus).Error; err != nil {
+		t.Fatal(err)
+	}
+	if mcpMenus != 0 {
+		t.Fatal("fresh database must not create the retired MCP service page")
+	}
 	var user models.User
 	if err := db.Preload("Roles.Permissions").Preload("Roles.Menus").Where("username = ?", "admin").First(&user).Error; err != nil {
 		t.Fatal(err)

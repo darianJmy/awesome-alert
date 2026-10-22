@@ -1,12 +1,15 @@
 <template>
   <el-container class="layout" :style="{ '--sidebar-width': isCollapse ? '72px' : '220px' }">
     <el-aside :width="isCollapse ? '72px' : '220px'" class="sidebar">
-      <router-link class="logo" :class="{ 'is-collapsed': isCollapse }" to="/dashboard" aria-label="返回首页">
+      <router-link class="logo" :class="{ 'is-collapsed': isCollapse }" to="/dashboard" :aria-label="`${platform.systemName}，返回首页`" :title="platform.systemName">
         <img v-if="platform.logoData" class="logo-image" :src="platform.logoData" alt="" />
-        <div v-else class="logo-mark">枢</div>
+        <span v-else class="logo-mark" aria-hidden="true">
+          <img src="/favicon.svg" alt="" />
+        </span>
+        <span v-if="!isCollapse" class="logo-name">{{ platform.systemName }}</span>
       </router-link>
       <div class="sidebar-menu">
-        <el-menu :default-active="activeMenu" router :collapse="isCollapse">
+        <el-menu :default-active="activeMenu" router :collapse="isCollapse" :collapse-transition="false">
           <template v-for="menu in menus" :key="menu.id">
             <el-sub-menu v-if="menu.children && menu.children.length" :index="String(menu.id)">
               <template #title>
@@ -257,11 +260,14 @@ async function handleChangePassword() {
 @media(max-width:960px){.ai-aside-panel{position:fixed;z-index:1900;top:64px;right:0;bottom:0;width:min(460px,100vw)!important;box-shadow:-8px 0 24px rgba(0,0,0,.12)}.ai-panel-resizer{display:none}}
 
 .layout {
+  --layout-header-height: 64px;
   height: 100vh;
   background: var(--ops-bg);
 }
 
 .sidebar {
+  flex-shrink: 0;
+  transition: width 180ms ease;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -275,12 +281,16 @@ async function handleChangePassword() {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 68px;
+  gap: 10px;
+  min-width: 0;
+  box-sizing: border-box;
+  flex: 0 0 var(--layout-header-height);
+  height: var(--layout-header-height);
   padding: 0 18px;
   color: inherit;
   text-decoration: none;
   background: var(--ops-surface);
-  border-bottom: 1px solid var(--ops-border-soft);
+  border-bottom: 1px solid var(--ops-border);
   cursor: pointer;
   transition: background-color 0.18s ease;
 }
@@ -300,15 +310,20 @@ async function handleChangePassword() {
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--ops-primary), var(--ops-accent));
 }
-.logo-image { width: min(154px, 100%); height: 36px; object-fit: contain; }
+.logo-mark img { display: block; width: 38px; height: 38px; }
+.logo-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ops-text);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+.logo-image { flex: 0 0 38px; width: 38px; height: 38px; object-fit: contain; }
 .logo.is-collapsed { padding: 0 10px; }
-.logo.is-collapsed .logo-image { width: 36px; height: 36px; object-fit: cover; object-position: left; }
 
 .sidebar-menu {
   flex: 1;
@@ -318,12 +333,32 @@ async function handleChangePassword() {
 }
 
 .sidebar :deep(.el-menu) {
+  box-sizing: border-box;
+  width: 100%;
+  transition: none;
   border-right: 0;
   padding: 10px;
 }
 
 .sidebar :deep(.el-menu--collapse) {
-  width: 72px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.sidebar :deep(.el-menu--collapse > .el-menu-item),
+.sidebar :deep(.el-menu--collapse > .el-sub-menu > .el-sub-menu__title),
+.sidebar :deep(.el-menu--collapse > .el-menu-item > .el-menu-tooltip__trigger) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.sidebar :deep(.el-menu--collapse > .el-menu-item .el-icon),
+.sidebar :deep(.el-menu--collapse > .el-sub-menu > .el-sub-menu__title > .el-icon) {
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .sidebar :deep(.el-menu-item),
@@ -333,6 +368,10 @@ async function handleChangePassword() {
   border-radius: 8px;
   color: var(--ops-muted);
   font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
 }
 
 .sidebar :deep(.el-menu-item:hover),
@@ -360,10 +399,12 @@ async function handleChangePassword() {
 }
 
 .header {
+  box-sizing: border-box;
+  flex: 0 0 var(--layout-header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  height: var(--layout-header-height);
   padding: 0 24px;
   background: color-mix(in srgb, var(--ops-surface) 86%, transparent);
   border-bottom: 1px solid var(--ops-border);

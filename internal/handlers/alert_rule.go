@@ -646,11 +646,11 @@ func datasourceIDsForSelection(tx *gorm.DB, datasourceGroupIDs, directDatasource
 	}
 	if len(directDatasourceIDs) > 0 {
 		var datasourceCount int64
-		if err := tx.Model(&models.Datasource{}).Where("id IN ? AND type = ? AND status = 1", directDatasourceIDs, "prometheus").Count(&datasourceCount).Error; err != nil {
+		if err := tx.Model(&models.Datasource{}).Where("id IN ? AND type IN ? AND status = 1", directDatasourceIDs, metricDatasourceTypes()).Count(&datasourceCount).Error; err != nil {
 			return nil, err
 		}
 		if datasourceCount != int64(len(directDatasourceIDs)) {
-			return nil, fmt.Errorf("数据源不存在、已停用或不是 Prometheus 类型")
+			return nil, fmt.Errorf("数据源不存在、已停用或不支持指标查询")
 		}
 	}
 	effectiveIDs := append([]uint{}, directDatasourceIDs...)
@@ -869,7 +869,7 @@ func decodeAlertRuleAnnotations(value string) map[string]string {
 func runDueAlertRuleBindings(now time.Time) {
 	startAlertRuleWorkers()
 	var bindings []models.AlertRuleBinding
-	database.DB.Table("alert_rule_bindings").Select("alert_rule_bindings.*").Joins("JOIN alert_rules ON alert_rules.id = alert_rule_bindings.rule_id").Joins("JOIN datasources ON datasources.id = alert_rule_bindings.datasource_id").Where("alert_rules.status = 1 AND datasources.status = 1 AND datasources.type = ? AND (alert_rule_bindings.next_evaluation_at IS NULL OR alert_rule_bindings.next_evaluation_at <= ?)", "prometheus", now).Order("alert_rule_bindings.next_evaluation_at ASC").Limit(5000).Scan(&bindings)
+	database.DB.Table("alert_rule_bindings").Select("alert_rule_bindings.*").Joins("JOIN alert_rules ON alert_rules.id = alert_rule_bindings.rule_id").Joins("JOIN datasources ON datasources.id = alert_rule_bindings.datasource_id").Where("alert_rules.status = 1 AND datasources.status = 1 AND datasources.type IN ? AND (alert_rule_bindings.next_evaluation_at IS NULL OR alert_rule_bindings.next_evaluation_at <= ?)", metricDatasourceTypes(), now).Order("alert_rule_bindings.next_evaluation_at ASC").Limit(5000).Scan(&bindings)
 	for _, binding := range bindings {
 		if _, loaded := alertRuleInFlight.LoadOrStore(binding.ID, struct{}{}); loaded {
 			continue
@@ -913,7 +913,7 @@ func evaluateAlertRuleBinding(bindingID uint, evaluatedAt time.Time) {
 	if database.DB.First(&binding, bindingID).Error != nil || database.DB.First(&rule, binding.RuleID).Error != nil || database.DB.First(&datasource, binding.DatasourceID).Error != nil {
 		return
 	}
-	if rule.Status != 1 || datasource.Status != 1 || datasource.Type != "prometheus" {
+	if rule.Status != 1 || datasource.Status != 1 || !isMetricDatasourceType(datasource.Type) {
 		return
 	}
 	series, err := queryPromRuleDatasource(datasource, rule.Expression, evaluatedAt)

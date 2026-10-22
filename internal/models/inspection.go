@@ -15,7 +15,7 @@ type InspectionItem struct {
 	Group                *InspectionRuleGroup `gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
 	ID                   uint                 `gorm:"primaryKey" json:"id"`
 	Name                 string               `gorm:"size:100;not null" json:"name"`
-	Type                 string               `gorm:"size:50;not null" json:"type"`     // http, icmp, tcp, certificate_expiry
+	Type                 string               `gorm:"size:50;not null" json:"type"`     // http, icmp, tcp, certificate_expiry, script
 	Target               string               `gorm:"size:500;not null" json:"target"`  // 便于列表展示的 URL 或 Host
 	Config               string               `gorm:"type:text" json:"config"`          // JSON: type-specific config
 	Labels               string               `gorm:"type:text" json:"external_labels"` // JSON: user-defined labels; exposed as external_labels in alerts

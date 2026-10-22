@@ -80,13 +80,13 @@ func GetUserInfo(c *gin.Context) {
 			continue
 		}
 		for _, perm := range role.Permissions {
-			if perm.Status == 1 {
+			if perm.Status == 1 && !strings.HasPrefix(perm.Code, "task:") {
 				permSet[perm.Code] = true
 			}
 		}
 		for _, menu := range role.Menus {
-			if menu.Status == 1 && menu.Type != 3 && !isRetiredChatMenu(menu) {
-				menuSet[menu.ID] = menu
+			if menu.Status == 1 && menu.Type != 3 && !isRetiredMenu(menu) {
+				menuSet[menu.ID] = monitoringMenu(menu)
 			}
 		}
 	}

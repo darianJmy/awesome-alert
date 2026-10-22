@@ -154,16 +154,17 @@ func wrapPromResponse(body []byte) gin.H {
 // PromDatasources returns available Prometheus datasources
 func PromDatasources(c *gin.Context) {
 	var ds []models.Datasource
-	database.DB.Where("status = 1 AND type = ?", "prometheus").Find(&ds)
+	database.DB.Where("status = 1 AND type IN ?", metricDatasourceTypes()).Find(&ds)
 	// only return id, name
 	type item struct {
 		ID   uint   `json:"id"`
 		Name string `json:"name"`
 		URL  string `json:"url"`
+		Type string `json:"type"`
 	}
 	result := make([]item, len(ds))
 	for i := range ds {
-		result[i] = item{ID: ds[i].ID, Name: ds[i].Name, URL: ds[i].URL}
+		result[i] = item{ID: ds[i].ID, Name: ds[i].Name, URL: ds[i].URL, Type: ds[i].Type}
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": result})
 }
@@ -176,12 +177,15 @@ func getPromDatasource(id uint) (models.Datasource, error) {
 		}
 	} else {
 		// pick first enabled prometheus
-		if err := database.DB.Where("status = 1 AND type = ?", "prometheus").First(&ds).Error; err != nil {
-			return ds, fmt.Errorf("没有可用的 Prometheus 数据源")
+		if err := database.DB.Where("status = 1 AND type IN ?", metricDatasourceTypes()).First(&ds).Error; err != nil {
+			return ds, fmt.Errorf("没有可用的指标数据源")
 		}
 	}
-	if ds.Type != "prometheus" {
-		return ds, fmt.Errorf("该数据源不是 Prometheus 类型")
+	if ds.Status != 1 {
+		return ds, fmt.Errorf("数据源实例已禁用")
+	}
+	if !isMetricDatasourceType(ds.Type) {
+		return ds, fmt.Errorf("该数据源不支持 PromQL 指标查询")
 	}
 	return ds, nil
 }

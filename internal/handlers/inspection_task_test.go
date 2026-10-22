@@ -9,13 +9,6 @@ import (
 	"time"
 )
 
-func TestInspectionTaskRejectsScriptProbeType(t *testing.T) {
-	err := validateInspectionItemReq(CreateInspectionItemReq{Type: "script"})
-	if err == nil || err.Error() != "不支持的拨测类型" {
-		t.Fatalf("expected script probe type to be rejected, got %v", err)
-	}
-}
-
 func TestInspectionTaskAllowsTenSecondInterval(t *testing.T) {
 	req := CreateInspectionItemReq{
 		Type: "http", IntervalSeconds: 10, FailureThreshold: 1, RecoveryThreshold: 1,
@@ -53,13 +46,6 @@ func TestInspectionExecutionRejectsPrometheusProbe(t *testing.T) {
 	status, result, _ := executeInspection(models.InspectionItem{Type: "prometheus", Config: `{}`})
 	if status != "error" || !strings.Contains(result, "不支持的拨测类型") {
 		t.Fatalf("Prometheus probe compatibility must be removed: status=%q result=%q", status, result)
-	}
-}
-
-func TestScheduledTaskRejectsEmbeddedScriptTypes(t *testing.T) {
-	status, _, _ := executeScheduledTarget(models.ScheduledTask{Type: "shell"})
-	if status != "error" {
-		t.Fatalf("embedded script task compatibility must be removed, got %q", status)
 	}
 }
 

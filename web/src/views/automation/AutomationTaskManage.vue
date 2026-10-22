@@ -18,8 +18,8 @@
       <template #empty><TableEmpty /></template>
     </el-table>
 
-    <el-drawer v-model="editorVisible" class="automation-task-drawer" size="680px" :close-on-click-modal="false">
-      <template #header><div class="drawer-header"><el-button text :icon="ArrowLeft" @click="editorVisible = false">返回</el-button><span>{{ form.id ? '编辑自动化任务' : '创建自动化任务' }}</span></div></template>
+    <el-drawer v-model="editorVisible" class="automation-task-drawer" size="min(460px, 94vw)" :close-on-click-modal="false">
+      <template #header><div class="drawer-header"><DrawerBackButton @click="editorVisible = false" /><span>{{ form.id ? '编辑自动化任务' : '创建自动化任务' }}</span></div></template>
       <el-form label-position="top">
         <el-form-item label="任务名称" required><el-input v-model="form.name" maxlength="128" /></el-form-item>
         <el-form-item label="代码来源" required :class="{ 'top-gap': form.runtime_profile === 'standard' }"><el-radio-group v-model="form.source_type" @change="handleSourceTypeChange"><el-radio-button value="script">在线脚本</el-radio-button><el-radio-button value="repository">Git 仓库</el-radio-button></el-radio-group></el-form-item>
@@ -54,6 +54,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ArrowLeft, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

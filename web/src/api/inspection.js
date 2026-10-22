@@ -36,12 +36,14 @@ export function deleteInspectionItem(id) {
   return request({ url: `/inspection-items/${id}`, method: 'delete' })
 }
 
-export function runInspectionItem(id) {
-  return request({ url: `/inspection-items/${id}/run`, method: 'post' })
+export function runInspectionItem(id, timeoutMs = 300000, nodeCount = 1) {
+  // The backend executes up to eight nodes concurrently.
+  const timeout = Math.ceil(Math.max(1, nodeCount) / 8) * (timeoutMs + 15000)
+  return request({ url: `/inspection-items/${id}/run`, method: 'post', timeout })
 }
 
 export function runAllInspections() {
-  return request({ url: '/inspection-items/run-all', method: 'post' })
+  return request({ url: '/inspection-items/run-all', method: 'post', timeout: 2200000 })
 }
 
 export function getInspectionRecords(params) {

@@ -165,6 +165,7 @@ func auditResource(path string) (string, string) {
 		"mcp-service":     {"MCP 服务", "mcp_service"},
 		"mcp-clients":     {"MCP 服务", "mcp_client"},
 		"mcp":             {"MCP 服务", "mcp_tool"},
+		"ai-models":       {"AI 模型", "ai_model"},
 		"git-credentials": {"Git 认证", "git_credential"},
 		"api-tokens":      {"访问令牌", "api_token"},
 		"system-settings": {"基础设置", "system_setting"}, "auth-settings": {"登录认证", "auth_setting"},
@@ -227,7 +228,7 @@ func sanitizeAuditMap(value map[string]interface{}) map[string]interface{} {
 
 func auditSensitiveKey(key string) bool {
 	normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, "_", ""), "-", ""))
-	for _, part := range []string{"password", "passwd", "token", "secret", "privatekey", "authconfig", "credential", "accesskey"} {
+	for _, part := range []string{"password", "passwd", "token", "secret", "privatekey", "authconfig", "credential", "accesskey", "apikey"} {
 		if strings.Contains(normalized, part) {
 			return true
 		}

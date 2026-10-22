@@ -1,5 +1,7 @@
 # 观澜 AI 助手实施方案
 
+> 2026-10-22 更新：模型编排已迁移为 Eino ReAct + 原生工具调用，以下为此前阶段记录。当前实现与扩展规范以 [AI 助手架构](ai-assistant-integration.md) 为准。
+
 更新日期：2026-10-20。目标：用户用自然语言调用观澜已有运维能力，回答有证据、执行可追溯、权限由后端决定。部署继续采用 Vue + Go + SQLite 单二进制。
 
 ## 现状盘点
@@ -38,7 +40,7 @@ flowchart TD
 - `internal/models`：已有 ChatMessage.Metadata 承载第一批追踪，不新增表，不修改现有数据库版本。
 - `web/src/components/AIExecutionTrace.vue`：聊天面板中的执行详情展示。
 - `pkg` 只承接可独立复用的基础设施，不把业务权限、会话和工具编排搬进去。
-- 不强制引入 eino、Redis 或向量数据库。现有 HTTP API 继续使用；MCP 是可选工具接入协议，不是每个本地调用的必经层。
+- 当前已采用 Eino 作为智能体编排底座；Redis 和向量数据库仍按实际需要接入。MCP 是工具接入协议，本地工具直接调用业务适配器。
 
 ## 分阶段交付
 

@@ -25,9 +25,9 @@
 
       <section class="form-section">
         <div class="section-heading"><div><strong>规则配置</strong><span>平台主动拉取数据源并按周期执行 PromQL</span></div></div>
-        <div class="field-label">数据源类型</div>
+        <div class="field-label">查询协议</div>
         <button type="button" class="source-card selected" aria-pressed="true">
-          <img :src="prometheusLogo" alt="" /><span>Prometheus</span><small>指标查询</small><el-icon><Check /></el-icon>
+          <img :src="prometheusLogo" alt="" /><span>PromQL</span><small>Prometheus / VictoriaMetrics</small><el-icon><Check /></el-icon>
         </button>
         <el-form-item class="datasource-field" prop="datasource_ids">
           <template #label><span class="detail-label">数据源<el-tooltip content="可同时选择多个数据源分组和多个数据源，实际执行范围取全部选择项的数据源并集。" placement="top"><el-icon class="detail-help-icon" tabindex="0" aria-label="数据源选择说明"><QuestionFilled /></el-icon></el-tooltip></span></template>

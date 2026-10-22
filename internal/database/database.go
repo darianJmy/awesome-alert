@@ -21,7 +21,7 @@ import (
 
 var DB *gorm.DB
 
-const CurrentSchemaVersion = "2026102001"
+const CurrentSchemaVersion = "2026102201"
 
 // Init is the legacy startup entry point. New callers should use New so errors
 // and connection cleanup can be managed by the application.
@@ -54,6 +54,9 @@ func New(cfg config.Config) (*gorm.DB, func(), error) {
 }
 
 func prepareDatabase(db *gorm.DB) error {
+	if err := upgradeAIModelSchema(db); err != nil {
+		return err
+	}
 	return sqldb.Initialize(db, CurrentSchemaVersion, createCurrentSchema, func(tx *gorm.DB) error {
 		if err := tx.Create(&models.InspectionRuleGroup{ID: 1, Name: "默认规则组", Description: "默认拨测任务规则组"}).Error; err != nil {
 			return err
@@ -96,6 +99,7 @@ func createCurrentSchema(db *gorm.DB) error {
 		&models.APIAccessToken{},
 		&models.MCPClient{},
 		&models.Tunnel{},
+		&models.AIModel{},
 		&models.ChatConversation{},
 		&models.ChatMessage{},
 		&models.ChatMemory{},

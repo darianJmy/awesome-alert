@@ -9,6 +9,13 @@
       <el-button link :icon="Plus" aria-label="新会话" title="新会话" :disabled="sending || loadingMessages" @click="newConversation" />
       <el-button link :icon="Close" aria-label="关闭 AI 助手" title="关闭 AI 助手" @click="$emit('close')" />
     </header>
+    <div class="chat-model-picker">
+      <el-select v-model="selectedModelID" placeholder="选择 AI 模型" aria-label="选择 AI 模型" :disabled="sending || loadingMessages || loadingModels" :loading="loadingModels">
+        <el-option v-for="model in availableModels" :key="model.id" :label="model.name" :value="model.id"><span>{{ model.name }}</span><small style="float:right;margin-left:12px;color:var(--ops-muted)">{{ model.provider }}</small></el-option>
+      </el-select>
+      <small v-if="!loadingModels && !availableModels.length">暂无可用模型，请管理员在系统设置 → AI 模型中添加。</small>
+      <small v-else-if="!selectedModelID">原模型已停用或删除，请重新选择。</small>
+    </div>
     <section v-if="historyVisible" class="chat-history" aria-label="会话历史列表">
       <div class="history-search">
         <el-input v-model="historySearch" placeholder="搜索会话" aria-label="搜索会话" clearable :prefix-icon="Search" />
@@ -28,7 +35,7 @@
         <section v-if="!activeConversationID && !messages.length" class="chat-welcome">
           <span class="welcome-icon"><Cpu /></span>
           <h2>有什么可以帮你？</h2>
-          <p>查询指标、日志或集群状态，结合执行详情了解分析过程。</p>
+          <p>查询指标、告警或任务，结合执行详情了解分析过程。</p>
           <div class="suggestions">
             <button v-for="item in suggestions" :key="item" type="button" @click="quickAsk(item)">{{ item }}</button>
           </div>
@@ -79,7 +86,7 @@
               circle
               :icon="Promotion"
               :loading="sending"
-              :disabled="!input.trim() || loadingMessages"
+              :disabled="!input.trim() || loadingMessages || !selectedModelID"
               aria-label="发送消息"
               @click="send"
             />
@@ -92,6 +99,7 @@
 
 <script setup>
 import AIExecutionTrace from './AIExecutionTrace.vue'
+import { getChatModels } from '../api/aiModel'
 import { computed, nextTick, ref, watch } from 'vue'
 import { Close, Cpu, Delete, Fold, Search, Plus, Promotion, User } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -99,6 +107,9 @@ import { deleteConversation, getConversations, getMessages, sendMessage } from '
 
 const props = defineProps({ visible: Boolean })
 defineEmits(['close'])
+const availableModels = ref([])
+const selectedModelID = ref(null)
+const loadingModels = ref(false)
 const historyVisible = ref(false)
 const historySearch = ref('')
 const conversations = ref([])
@@ -133,11 +144,20 @@ async function openChat() {
   if (loadingConversations.value) return
   const firstOpen = !initialized
   initialized = true
-  await loadConversations()
+  await Promise.all([loadConversations(), loadModels()])
   if (firstOpen && !sending.value && !input.value.trim() && !activeConversationID.value && !messages.value.length && conversations.value.length) {
     await selectConversation(conversations.value[0])
   }
   nextTick(() => { if (props.visible && !historyVisible.value) inputRef.value?.focus() })
+}
+
+async function loadModels() {
+  loadingModels.value = true
+  try {
+    availableModels.value = (await getChatModels()).data || []
+    if (!availableModels.value.some(item => item.id === selectedModelID.value)) selectedModelID.value = activeConversationID.value ? null : availableModels.value[0]?.id || null
+  } catch { availableModels.value = []; selectedModelID.value = null }
+  finally { loadingModels.value = false }
 }
 
 async function loadConversations() {
@@ -155,6 +175,7 @@ function newConversation() {
   if (sending.value || loadingMessages.value) return
   historyVisible.value = false
   activeConversationID.value = 0
+  if (!selectedModelID.value) selectedModelID.value = availableModels.value[0]?.id || null
   messages.value = []
   input.value = ''
   nextTick(() => { if (props.visible && !historyVisible.value) inputRef.value?.focus() })
@@ -167,6 +188,7 @@ async function selectConversation(conversation) {
   try {
     const result = await getMessages(conversation.id)
     activeConversationID.value = conversation.id
+    selectedModelID.value = availableModels.value.some(item => item.id === conversation.model_id) ? conversation.model_id : (conversation.model_id ? null : availableModels.value[0]?.id || null)
     messages.value = result.data || []
     historyVisible.value = false
     await scrollToBottom()
@@ -204,6 +226,7 @@ function handleKeydown(event) {
 async function send() {
   const content = input.value.trim()
   if (!content || sending.value || loadingMessages.value) return
+  if (!selectedModelID.value) { ElMessage.warning("请先选择可用的 AI 模型"); return }
 
   input.value = ''
   sending.value = true
@@ -212,7 +235,7 @@ async function send() {
   await scrollToBottom()
 
   try {
-    const response = await sendMessage({ conversation_id: activeConversationID.value || 0, message: content })
+    const response = await sendMessage({ conversation_id: activeConversationID.value || 0, message: content, model_id: selectedModelID.value })
     activeConversationID.value = response.data.conversation_id
     const [messageResult, conversationResult] = await Promise.all([
       getMessages(activeConversationID.value),
@@ -223,7 +246,8 @@ async function send() {
   } catch {
     messages.value = messages.value.filter(item => item.id !== optimisticID)
     input.value = content
-    ElMessage.error('发送失败，请稍后重试')
+    await loadModels()
+    ElMessage.error('发送失败，请检查所选模型后重试')
   } finally {
     sending.value = false
     await scrollToBottom()
@@ -346,4 +370,8 @@ function renderMarkdown(value) {
 .messages-container{min-height:0;flex:1;overflow-y:auto;padding:22px 24px}.message{display:flex;align-items:flex-start;gap:10px;margin-bottom:22px}.message.user{flex-direction:row-reverse}.message-avatar{display:grid;width:34px;height:34px;flex:0 0 34px;place-items:center;color:var(--ops-primary);background:var(--ops-primary-soft);border:1px solid color-mix(in srgb,var(--ops-primary) 22%,var(--ops-border));border-radius:10px}.message.user .message-avatar{color:#fff;background:#27354d;border-color:#27354d}.message-avatar svg{width:18px}.message-body{min-width:0;max-width:min(760px,82%)}.message.user .message-body{display:flex;align-items:flex-end;flex-direction:column}.message-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px;color:var(--ops-muted);font-size:10px}.message-meta strong{color:var(--ops-text);font-size:11px}.message-content{box-sizing:border-box;padding:11px 14px;color:var(--ops-text);background:var(--ops-surface);border:1px solid var(--ops-border-soft);border-radius:4px 12px 12px 12px;font-size:12px;line-height:1.7;box-shadow:0 2px 7px color-mix(in srgb,var(--ops-text) 4%,transparent)}.message.user .message-content{color:#fff;background:#315f95;border-color:#315f95;border-radius:12px 4px 12px 12px;white-space:pre-wrap}.thinking-dots{display:flex;width:58px;gap:5px;padding:14px 16px;background:var(--ops-surface);border:1px solid var(--ops-border-soft);border-radius:4px 12px 12px 12px}.thinking-dots i{width:6px;height:6px;background:var(--ops-primary);border-radius:50%;animation:chat-dot 1.2s infinite ease-in-out}.thinking-dots i:nth-child(2){animation-delay:.15s}.thinking-dots i:nth-child(3){animation-delay:.3s}@keyframes chat-dot{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}.input-area{padding:12px 16px 10px;background:var(--ops-surface);border-top:1px solid var(--ops-border-soft)}.input-shell{position:relative}.input-shell :deep(.el-textarea__inner){padding:11px 48px 24px 12px;border-radius:8px;box-shadow:0 0 0 1px var(--ops-border) inset!important}.input-shell :deep(.el-input__count){right:47px;bottom:5px;background:transparent;font-size:9px}.send-button{position:absolute;right:10px;bottom:10px;width:31px;height:31px}.input-area>small{display:block;margin-top:6px;color:var(--ops-muted);font-size:9px}.markdown-body :deep(p){margin:0 0 8px}.markdown-body :deep(p:last-child){margin-bottom:0}.markdown-body :deep(h3),.markdown-body :deep(h4),.markdown-body :deep(h5),.markdown-body :deep(h6){margin:12px 0 6px;font-size:13px}.markdown-body :deep(code){padding:1px 4px;color:#315f95;background:var(--ops-primary-soft);border-radius:3px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.markdown-body :deep(pre){overflow:auto;margin:8px 0;padding:11px;color:#dbeafe;background:#111827;border-radius:6px;font:10px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}.markdown-body :deep(pre code){padding:0;color:inherit;background:transparent}.markdown-body :deep(ul),.markdown-body :deep(ol){margin:7px 0;padding-left:20px}.markdown-body :deep(blockquote){margin:8px 0;padding:7px 10px;color:var(--ops-muted);background:var(--ops-surface-soft);border-left:3px solid var(--ops-primary)}.markdown-body :deep(hr){margin:12px 0;border:0;border-top:1px solid var(--ops-border)}.markdown-body :deep(a){color:var(--ops-primary)}.markdown-table-wrap{max-width:100%;overflow-x:auto;margin:8px 0}.markdown-body :deep(table){width:100%;border-collapse:collapse}.markdown-body :deep(th),.markdown-body :deep(td){padding:6px 8px;text-align:left;border:1px solid var(--ops-border);font-size:10px}.markdown-body :deep(th){background:var(--ops-surface-soft);font-weight:650}
 .message-content{overflow-wrap:anywhere}.markdown-body :deep(.markdown-table-wrap){max-width:100%;overflow-x:auto;margin:8px 0}
 @media(max-width:600px){.chat-header{padding:10px 12px}.messages-container{padding:16px 12px}.message-body{max-width:85%}.chat-welcome{justify-content:flex-start;padding:20px}.suggestions{margin-top:14px}}
+</style>
+
+<style scoped>
+.chat-model-picker{display:flex;flex-direction:column;gap:6px;padding:8px 16px;border-bottom:1px solid var(--ops-border)}.chat-model-picker small{font-size:11px;color:var(--ops-muted)}
 </style>

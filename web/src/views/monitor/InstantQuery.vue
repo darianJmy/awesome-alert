@@ -5,7 +5,7 @@
         <el-select
           v-model="selectedDS"
           class="datasource-select"
-          aria-label="Prometheus 数据源"
+          aria-label="指标数据源"
           multiple
           filterable
           collapse-tags
@@ -175,7 +175,7 @@
     <el-drawer v-model="historyVisible" class="query-history-drawer" size="420px" append-to-body>
       <template #header>
         <div class="history-drawer-header">
-          <strong>历史查询</strong>
+          <div class="standard-drawer-header"><DrawerBackButton @click="historyVisible = false" /><strong>历史查询</strong></div>
           <el-button v-if="queryHistory.length" text type="danger" @click="clearQueryHistory">清空</el-button>
         </div>
       </template>
@@ -195,6 +195,7 @@
 </template>
 
 <script setup>
+import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { ref, reactive, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { promInstantQuery, promRangeQuery, getPromDatasources, promMetadata, getPromQueryHistory, clearPromQueryHistory } from '../../api/prometheus'
 import { ElMessage } from 'element-plus'
@@ -579,7 +580,7 @@ async function executeInstantQuery() {
   finally {
     execTime.value = ((performance.now() - startTime) / 1000).toFixed(2) + 's'
     loading.value = false
-    if (result.value?.status === 'error') { error.value = result.value.error || 'Prometheus 返回错误'; result.value = null }
+    if (result.value?.status === 'error') { error.value = result.value.error || '指标数据源返回错误'; result.value = null }
   }
 }
 
@@ -604,7 +605,7 @@ async function executeRangeQuery() {
   finally {
     execTime.value = ((performance.now() - startTime) / 1000).toFixed(2) + 's'
     loading.value = false
-    if (result.value?.status === 'error') { error.value = result.value.error || 'Prometheus 返回错误'; result.value = null }
+    if (result.value?.status === 'error') { error.value = result.value.error || '指标数据源返回错误'; result.value = null }
   }
 }
 

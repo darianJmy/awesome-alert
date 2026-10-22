@@ -1,5 +1,7 @@
 # AIOps Function Calling 重构准绳
 
+> 2026-10-22 实现更新：编排采用 Eino ReAct，模型通过原生 tools/tool_calls 或 tool_use/tool_result 调用工具。本文的自定义 Tool Call JSON 示例为旧设计，当前分层与扩展规范见 [AI 助手架构](architecture/ai-assistant-integration.md)。
+
 ## 定位
 
 本文件是后续智能运维重构的架构准绳。目标是建设个人 AIOps 平台的智能运维核心：全只读数据源、强智能自由度、长期可扩展、可演示、可逐步产品化。
