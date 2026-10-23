@@ -207,6 +207,8 @@ make dev CONF=./configs/config.example.yaml
 
 首次启动会自动构建缺失的前端资源。Air 使用固定版本，不要求全局安装；监听后端源码、生成的 Wire 文件和配置目录。仓库外的配置文件修改后需要手动重启。
 
+项目要求 Go 1.25.0 或更高版本；较旧的 Go 会自动下载所需工具链。Makefile 和 Air 构建默认使用 `https://goproxy.cn,direct`，避免默认代理连接超时；可通过 `GOPROXY` 环境变量覆盖。直接运行 Go 命令时可使用 `GOPROXY=https://goproxy.cn,direct go build .`。
+
 ### 前端：Vite 热更新
 
 在另一个终端运行：

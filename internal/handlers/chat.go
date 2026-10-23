@@ -490,7 +490,7 @@ func collectPlatformKnowledge() string {
 			return truncateStr(string(body), 5000)
 		}
 	}
-	return `观澜运维平台包含数据源、数据源分组、Prometheus 查询、拨测、脚本、自动化任务、证书和用户权限等模块。助手只能通过后端白名单工具读取和操作平台资源；明确请求且参数齐全时可创建工具清单中开放的资源，包括无认证直连数据源、故障中心、各类分组、通知模板及邮件对象；其余写操作以当前工具清单为准。`
+	return `观澜运维平台包含数据源、数据源分组、Prometheus 查询、拨测、脚本、自动化任务、证书和用户权限等模块。助手只能通过后端白名单工具读取和操作平台资源；明确请求且参数齐全时可创建工具清单中开放的资源，包括无认证直连数据源、故障中心、各类分组、通知模板及邮件对象；可创建/修改具体告警规则，并通过 search_platform_operations、describe_platform_operation、execute_platform_operation 发现和执行平台目录操作，权限以实际执行检查为准。`
 }
 
 func executePromQLContext(ctx context.Context, ds models.Datasource, query string) (string, error) {

@@ -2,6 +2,9 @@
 
 AIR_VERSION := v1.63.0
 
+# 国内开发环境默认使用镜像；可通过环境变量或 make 参数覆盖。
+export GOPROXY ?= https://goproxy.cn,direct
+
 test:
 	go test ./...
 
