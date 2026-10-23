@@ -1,0 +1,229 @@
+package handlers
+
+import (
+	"encoding/json"
+	"fmt"
+	"guanlan/internal/database"
+	"guanlan/internal/models"
+	"guanlan/pkg/logger"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+type PromQueryReq struct {
+	DatasourceID uint   `json:"datasource_id"`
+	Query        string `json:"query" binding:"required"`
+	Time         string `json:"time"` // RFC3339 or unix timestamp
+}
+
+func PromInstantQuery(c *gin.Context) {
+	var req PromQueryReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误: " + err.Error()})
+		return
+	}
+
+	ds, err := getPromDatasource(req.DatasourceID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	if err := recordPromQueryHistory(c, ds, req.Query, "table"); err != nil {
+		logger.Warn("record Prometheus query history failed", "error", err)
+	}
+
+	params := url.Values{}
+	params.Set("query", req.Query)
+	if req.Time != "" {
+		params.Set("time", req.Time)
+	}
+	apiURL := fmt.Sprintf("%s/api/v1/query?%s", strings.TrimRight(ds.URL, "/"), params.Encode())
+
+	body, err := doPromHTTP(ds, apiURL)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, wrapPromResponse(body))
+}
+
+type PromRangeReq struct {
+	DatasourceID uint   `json:"datasource_id"`
+	Query        string `json:"query" binding:"required"`
+	Start        string `json:"start" binding:"required"`
+	End          string `json:"end" binding:"required"`
+	Step         string `json:"step" binding:"required"`
+}
+
+func PromRangeQuery(c *gin.Context) {
+	var req PromRangeReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误: " + err.Error()})
+		return
+	}
+
+	ds, err := getPromDatasource(req.DatasourceID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+	if err := recordPromQueryHistory(c, ds, req.Query, "graph"); err != nil {
+		logger.Warn("record Prometheus range query history failed", "error", err)
+	}
+
+	params := url.Values{}
+	params.Set("query", req.Query)
+	params.Set("start", req.Start)
+	params.Set("end", req.End)
+	params.Set("step", req.Step)
+	apiURL := fmt.Sprintf("%s/api/v1/query_range?%s", strings.TrimRight(ds.URL, "/"), params.Encode())
+
+	body, err := doPromHTTP(ds, apiURL)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, wrapPromResponse(body))
+}
+
+// PromMetadata returns available metrics, label names, or label values
+func PromMetadata(c *gin.Context) {
+	datasourceID, _ := strconv.Atoi(c.Query("datasource_id"))
+	target := c.Query("target") // "metrics" | "labels" | "label_values"
+	match := c.Query("match")   // label selector
+
+	ds, err := getPromDatasource(uint(datasourceID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		return
+	}
+
+	var apiURL string
+	switch target {
+	case "metrics":
+		apiURL = fmt.Sprintf("%s/api/v1/label/__name__/values", strings.TrimRight(ds.URL, "/"))
+	case "labels":
+		apiURL = fmt.Sprintf("%s/api/v1/labels", strings.TrimRight(ds.URL, "/"))
+		if match != "" {
+			apiURL += "?match[]=" + url.QueryEscape(match)
+		}
+	case "label_values":
+		label := c.Query("label")
+		apiURL = fmt.Sprintf("%s/api/v1/label/%s/values", strings.TrimRight(ds.URL, "/"), label)
+		if match != "" {
+			apiURL += "?match[]=" + url.QueryEscape(match)
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "unknown target"})
+		return
+	}
+
+	body, err := doPromHTTP(ds, apiURL)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, wrapPromResponse(body))
+}
+
+// wrapPromResponse parses a Prometheus API response and wraps it in the standard format
+func wrapPromResponse(body []byte) gin.H {
+	var promResp struct {
+		Status string      `json:"status"`
+		Data   interface{} `json:"data"`
+		Error  string      `json:"error"`
+	}
+	json.Unmarshal(body, &promResp)
+	if promResp.Status == "success" {
+		return gin.H{"code": 0, "message": "成功", "data": promResp.Data}
+	}
+	msg := promResp.Error
+	if msg == "" {
+		msg = string(body)
+	}
+	return gin.H{"code": 1, "message": msg}
+}
+
+// PromDatasources returns available Prometheus datasources
+func PromDatasources(c *gin.Context) {
+	var ds []models.Datasource
+	database.DB.Where("status = 1 AND type IN ?", metricDatasourceTypes()).Find(&ds)
+	// only return id, name
+	type item struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+		URL  string `json:"url"`
+		Type string `json:"type"`
+	}
+	result := make([]item, len(ds))
+	for i := range ds {
+		result[i] = item{ID: ds[i].ID, Name: ds[i].Name, URL: ds[i].URL, Type: ds[i].Type}
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": result})
+}
+
+func getPromDatasource(id uint) (models.Datasource, error) {
+	var ds models.Datasource
+	if id > 0 {
+		if err := database.DB.First(&ds, id).Error; err != nil {
+			return ds, fmt.Errorf("数据源不存在")
+		}
+	} else {
+		// pick first enabled prometheus
+		if err := database.DB.Where("status = 1 AND type IN ?", metricDatasourceTypes()).First(&ds).Error; err != nil {
+			return ds, fmt.Errorf("没有可用的指标数据源")
+		}
+	}
+	if ds.Status != 1 {
+		return ds, fmt.Errorf("数据源实例已禁用")
+	}
+	if !isMetricDatasourceType(ds.Type) {
+		return ds, fmt.Errorf("该数据源不支持 PromQL 指标查询")
+	}
+	return ds, nil
+}
+
+func doPromHTTP(ds models.Datasource, apiURL string) ([]byte, error) {
+	client, cleanup, err := datasourceHTTPClient(ds, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("请求 Prometheus 失败: %s", err.Error())
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	// On error, wrap as JSON so the frontend can parse it
+	if resp.StatusCode != http.StatusOK {
+		return []byte(fmt.Sprintf(`{"status":"error","error":"Prometheus returned %d: %s"}`, resp.StatusCode, string(body))), nil
+	}
+	return body, nil
+}
+
+// Decode a Prometheus response (used by chat handler)
+func parsePromResponse(body []byte) ([]map[string]interface{}, error) {
+	var promResp struct {
+		Status string `json:"status"`
+		Data   struct {
+			ResultType string                   `json:"resultType"`
+			Result     []map[string]interface{} `json:"result"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &promResp); err != nil {
+		return nil, err
+	}
+	if promResp.Status != "success" {
+		return nil, fmt.Errorf("prometheus error response")
+	}
+	return promResp.Data.Result, nil
+}

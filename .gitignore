@@ -1,2 +1,18 @@
-.idea/
-.code/
+/data/
+/guanlan
+/.cache/
+.env
+.env.*
+/web/node_modules/
+/web/dist/
+.playwright-cli/
+
+# Local SQLite databases and WAL sidecars
+*.db
+*.db-wal
+*.db-shm
+
+/logs/
+
+# Air local development build output
+/.air-tmp/

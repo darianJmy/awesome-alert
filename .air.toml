@@ -1,0 +1,67 @@
+# Air 本地开发配置；仓库根目录执行 make dev 或 air -c .air.toml。
+root = "."
+tmp_dir = ".air-tmp"
+
+[build]
+  # Wire 依赖声明变更后手动执行 make wire，日常热重载不重复生成。
+  pre_cmd = []
+  # 入口在根目录 main.go；保留调试信息，不使用 -s/-w 裁剪。
+  cmd = "CGO_ENABLED=0 go build -o ./.air-tmp/guanlan ."
+  post_cmd = []
+  bin = ".air-tmp/guanlan"
+  # 当前应用不读取 APP_ENV，直接使用内置配置或 --conf/APP_* 覆盖。
+  # 开发时前端占用 8080，后端仅在本机 8081 接受 Vite 代理请求。
+  full_bin = "APP_SERVER_ADDR=0.0.0.0:8081 ./.air-tmp/guanlan"
+  args_bin = []
+
+  # 只监听后端实现、服务入口、配置及前端 embed 入口。
+  include_dir = ["internal", "pkg", "configs", "conf", "web"]
+  include_ext = ["go", "yaml", "yml"]
+  include_file = [".env", "go.mod", "go.sum", "main.go"]
+  exclude_dir = [
+    ".air-tmp", ".git", ".agents", ".codex", ".aws", ".cache", ".vite",
+    "vendor", "data", "logs", "assets", "test", "build", "deployments", "docs",
+    "internal/agent", "web/node_modules", "web/dist", "web/src", "web/tests"
+  ]
+  exclude_file = []
+  # wire_gen.go 仍受监听，手动生成后会触发构建。
+  exclude_regex = ["_test\\.go$", "(^|/)wire\\.go$"]
+  exclude_unchanged = true
+  follow_symlink = false
+  log = "build-errors.log"
+
+  # fsnotify 事件驱动，1 秒防抖合并连续保存。
+  poll = false
+  poll_interval = 500
+  delay = 1000
+  stop_on_error = true
+  # 先发送 SIGINT，最多等待 2 秒后终止进程。
+  # 这只是 Air 的进程退出策略，不代表应用已实现 HTTP 优雅关闭。
+  send_interrupt = true
+  kill_delay = "2s"
+  rerun = false
+  rerun_delay = 500
+
+[log]
+  time = false
+  main_only = false
+  silent = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true
+
+[screen]
+  clear_on_rebuild = true
+  keep_scroll = true
+
+[proxy]
+  # 前端热更新由 Vite 负责。
+  enabled = false
+  proxy_port = 8090
+  app_port = 8081
