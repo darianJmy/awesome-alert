@@ -38,12 +38,7 @@ func New(cfg config.Config) (*gorm.DB, func(), error) {
 }
 
 func prepareDatabase(db *gorm.DB) error {
-	return sqldb.Initialize(db, CurrentSchemaVersion, createCurrentSchema, func(tx *gorm.DB) error {
-		if err := tx.Create(&models.InspectionRuleGroup{ID: 1, Name: "默认规则组", Description: "默认拨测任务规则组"}).Error; err != nil {
-			return err
-		}
-		return seedInitialData(tx)
-	})
+	return sqldb.Initialize(db, CurrentSchemaVersion, createCurrentSchema, seedInitialData)
 }
 
 func openDatabaseDSN(dsn string) (*gorm.DB, error) {
@@ -84,8 +79,6 @@ func createCurrentSchema(db *gorm.DB) error {
 		&models.ChatConversation{},
 		&models.ChatMessage{},
 		&models.ChatMemory{},
-		&models.ScheduledTask{},
-		&models.ScheduledTaskExecution{},
 		&models.Certificate{},
 		&models.CertificateVersion{},
 		&models.CertificateDomain{},

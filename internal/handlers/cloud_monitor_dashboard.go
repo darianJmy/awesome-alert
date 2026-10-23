@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	sls "github.com/alibabacloud-go/sls-20201230/v6/client"
 	"github.com/alibabacloud-go/tea/tea"
@@ -38,15 +39,15 @@ type cloudMonitorWorkspaceReq struct {
 }
 
 type cloudMonitorWorkspaceView struct {
-	ID                    uint   `json:"id"`
-	Name                  string `json:"name"`
-	Workspace             string `json:"workspace"`
-	Region                string `json:"region"`
-	RegionName            string `json:"region_name"`
-	Description           string `json:"description"`
-	CredentialsConfigured bool   `json:"credentials_configured"`
-	CreatedAt             string `json:"created_at"`
-	UpdatedAt             string `json:"updated_at"`
+	ID                    uint      `json:"id"`
+	Name                  string    `json:"name"`
+	Workspace             string    `json:"workspace"`
+	Region                string    `json:"region"`
+	RegionName            string    `json:"region_name"`
+	Description           string    `json:"description"`
+	CredentialsConfigured bool      `json:"credentials_configured"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }
 
 func ListCloudMonitorWorkspaces(c *gin.Context) {
@@ -66,7 +67,7 @@ func ListCloudMonitorWorkspaces(c *gin.Context) {
 		data = append(data, cloudMonitorWorkspaceView{
 			ID: item.ID, Name: item.Name, Workspace: item.Workspace, Region: item.Region, RegionName: cloudMonitorRegions[item.Region],
 			Description: item.Description, CredentialsConfigured: item.AccessKeyIDCipher != "" && item.AccessKeySecretCipher != "",
-			CreatedAt: item.CreatedAt.Format("2006-01-02 15:04:05"), UpdatedAt: item.UpdatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "成功", "data": data})
@@ -97,7 +98,7 @@ func CreateCloudMonitorWorkspace(c *gin.Context) {
 		Endpoint: slsRegionEndpoint(req.Region), AccessKeyIDCipher: accessKeyIDCipher,
 		AccessKeySecretCipher: accessKeySecretCipher, Description: strings.TrimSpace(req.Description),
 	}
-	if err := database.DB.Create(&item).Error; err != nil {
+	if err := createDashboardAtFront(&item); err != nil {
 		if isCloudMonitorDuplicate(err) {
 			c.JSON(http.StatusConflict, gin.H{"code": 409, "message": "该地域下的 Workspace 已存在"})
 			return

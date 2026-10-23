@@ -231,7 +231,7 @@ async function handleBatchCommand(command) {
 .type-group-title {
   font-size: 14px;
   font-weight: 700;
-  color: #303133;
+  color: var(--ops-text);
   margin-bottom: 10px;
 }
 .type-grid {
@@ -245,7 +245,7 @@ async function handleBatchCommand(command) {
   align-items: center;
   justify-content: center;
   padding: 12px 6px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--ops-border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
@@ -256,8 +256,8 @@ async function handleBatchCommand(command) {
 }
 .type-card:hover,
 .type-card.active {
-  border-color: #409EFF;
-  background-color: #ecf5ff;
+  border-color: var(--ops-primary);
+  background-color: var(--ops-primary-soft);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
 }
@@ -270,7 +270,7 @@ async function handleBatchCommand(command) {
 }
 .type-card-desc {
   font-size: 11px;
-  color: #909399;
+  color: var(--ops-muted);
   margin-top: 4px;
 }
 .type-card-logo {
@@ -301,7 +301,7 @@ async function handleBatchCommand(command) {
   padding: 14px 16px;
   margin-bottom: 16px;
   background: #f8fafc;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--ops-border);
   border-radius: 10px;
 }
 .selected-type-icon {
@@ -329,11 +329,11 @@ async function handleBatchCommand(command) {
 .selected-type-label {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--ops-text);
 }
 .selected-type-desc {
   font-size: 12px;
-  color: #909399;
+  color: var(--ops-muted);
   margin-top: 2px;
 }
 
@@ -361,28 +361,28 @@ async function handleBatchCommand(command) {
   width: 26px;
   height: 26px;
   color: #8a94a3;
-  background: #fff;
-  border-color: #dcdfe6;
+  background: var(--ops-surface);
+  border-color: var(--ops-border);
 }
 .label-row .label-icon-button :deep(.el-icon) { font-size: 14px; }
 .label-row .label-icon-button:hover,
 .label-row .label-icon-button:focus-visible {
   color: #606b7b;
-  background: #f5f7fa;
+  background: var(--ops-surface-soft);
   border-color: #c8cdd5;
 }
-.field-help { margin-top: 7px; color: #909399; font-size: 12px; line-height: 1.5; }
+.field-help { margin-top: 7px; color: var(--ops-muted); font-size: 12px; line-height: 1.5; }
 
 /* 表单标签（放在 el-form-item 上方） */
 .form-label {
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: var(--ops-muted);
   margin-bottom: 6px;
   margin-top: 4px;
 }
 .form-label .required {
-  color: #F56C6C;
+  color: var(--ops-danger);
   margin-left: 2px;
 }
 
@@ -390,10 +390,10 @@ async function handleBatchCommand(command) {
 .auth-segmented {
   display: flex;
   width: 100%;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--ops-border);
   border-radius: 8px;
   overflow: hidden;
-  background: #f5f7fa;
+  background: var(--ops-surface-soft);
 }
 .auth-seg {
   flex: 1;
@@ -405,7 +405,7 @@ async function handleBatchCommand(command) {
   border: none;
   background: transparent;
   font-size: 13px;
-  color: #606266;
+  color: var(--ops-muted);
   cursor: pointer;
   transition: all 0.2s;
   outline: none;
@@ -413,14 +413,14 @@ async function handleBatchCommand(command) {
   font-family: inherit;
 }
 .auth-seg + .auth-seg {
-  border-left: 1px solid #dcdfe6;
+  border-left: 1px solid var(--ops-border);
 }
 .auth-seg:hover {
-  color: #409EFF;
+  color: var(--ops-primary);
   background: rgba(64,158,255,0.04);
 }
 .auth-seg.active {
-  background: #409EFF;
+  background: var(--ops-primary);
   color: #fff;
 }
 
@@ -432,7 +432,7 @@ async function handleBatchCommand(command) {
 .advanced-config {
   margin-top: 4px;
   overflow: hidden;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--ops-border);
   border-radius: 8px;
 }
 .advanced-config :deep(.el-collapse-item__header) {
@@ -445,21 +445,21 @@ async function handleBatchCommand(command) {
 .advanced-config :deep(.el-collapse-item__content) { padding: 0 14px 16px; }
 .advanced-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .advanced-content { display: flex; flex-direction: column; gap: 14px; }
-.advanced-heading { color: #303133; font-size: 13px; font-weight: 600; }
-.advanced-heading span { color: #909399; font-weight: 400; }
+.advanced-heading { color: var(--ops-text); font-size: 13px; font-weight: 600; }
+.advanced-heading span { color: var(--ops-muted); font-weight: 400; }
 .header-editor { display: flex; flex-direction: column; gap: 8px; }
 .header-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px; align-items: center; gap: 8px; }
 .header-remove-button {
   width: 26px;
   height: 26px;
   color: #8a94a3;
-  background: #fff;
-  border-color: #dcdfe6;
+  background: var(--ops-surface);
+  border-color: var(--ops-border);
 }
 .header-remove-button:hover,
 .header-remove-button:focus-visible {
   color: #606b7b;
-  background: #f5f7fa;
+  background: var(--ops-surface-soft);
   border-color: #c8cdd5;
 }
 .add-header-button { width: 100%; border-style: dashed; }
@@ -483,7 +483,7 @@ async function handleBatchCommand(command) {
 .extra-label {
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: var(--ops-muted);
 }
 
 /* 表单底部 */
@@ -508,12 +508,12 @@ async function handleBatchCommand(command) {
 
 :global(.el-drawer.datasource-drawer) { border-radius:0; }
 .drawer-header { display:flex; align-items:center; gap:12px; }
-.drawer-title { font-size:16px; font-weight:600; color:#303133; }
+.drawer-title { font-size:16px; font-weight:600; color:var(--ops-text); }
 .back-button { padding:8px 6px; }
 .type-card { background:var(--el-bg-color); font-family:inherit; color:var(--el-text-color-primary); }
-.type-card:focus-visible,.auth-seg:focus-visible { outline:2px solid #409eff; outline-offset:3px; }
+.type-card:focus-visible,.auth-seg:focus-visible { outline:2px solid var(--ops-primary); outline-offset:3px; }
 .selected-type-text { flex:1; min-width:0; }
-.config-form :deep(.el-form-item__label) { font-size:13px; font-weight:500; color:#606266; }
+.config-form :deep(.el-form-item__label) { font-size:13px; font-weight:500; color:var(--ops-muted); }
 .config-form .kv-editor>.el-button { width:100%; }
 .picker-footer { display:flex; justify-content:flex-end; }
 @media(max-width:460px) { .type-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }

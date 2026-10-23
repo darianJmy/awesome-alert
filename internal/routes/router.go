@@ -104,6 +104,8 @@ func SetupRouter() *gin.Engine {
 			auth.POST("/tunnels/:id/test", handlers.TestTunnelConnection)
 
 			auth.GET("/dashboard/overview", middleware.RequirePermission("dashboard:list"), handlers.GetDashboardOverview)
+			auth.GET("/dashboard-cards", middleware.RequirePermission("dashboard:list"), handlers.ListDashboardCards)
+			auth.PUT("/dashboard-cards/order", middleware.RequirePermission("dashboard:edit"), handlers.ReorderDashboardCards)
 			auth.GET("/dashboards", handlers.ListDashboards)
 			auth.POST("/dashboards", handlers.CreateDashboard)
 			auth.PUT("/dashboards/:id", handlers.UpdateDashboard)

@@ -422,7 +422,7 @@ function formatTime(value) {
 </script>
 
 <style scoped>
-.task-page { --border: #e1e8f1; display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+.task-page { --border:var(--ops-border); display: flex; min-width: 0; flex-direction: column; gap: 16px; }
 .task-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .filter-bar { display: grid; min-width: 0; flex: 0 0 auto; grid-template-columns: 260px 120px 100px auto; gap: 8px; }
 .filter-bar > * { min-width: 0; width: 100%; }
@@ -510,7 +510,7 @@ function formatTime(value) {
 }
 
 :deep(.channel-drawer .el-drawer__body) {
-  background: #fff;
+  background: var(--ops-surface);
   padding: 18px 20px;
 }
 
@@ -531,11 +531,11 @@ function formatTime(value) {
   height: 32px;
   padding: 0 8px;
   font-size: 14px;
-  color: #3b6ea8;
+  color: var(--ops-primary);
 }
 
 .drawer-title {
-  color: #303133;
+  color: var(--ops-text);
   font-size: 16px;
   font-weight: 600;
 }
@@ -545,7 +545,7 @@ function formatTime(value) {
   align-items: center;
   gap: 10px;
   margin-bottom: 18px;
-  color: #1f2937;
+  color: var(--ops-text);
   font-weight: 700;
 }
 
@@ -581,7 +581,7 @@ function formatTime(value) {
   height: 100px;
   padding: 0;
   cursor: pointer;
-  background: #fff;
+  background: var(--ops-surface);
   border: 1px solid #d9d9d9;
   border-radius: 6px;
   outline: 1px solid transparent;
@@ -600,7 +600,7 @@ function formatTime(value) {
 }
 
 .type-card:hover {
-  border-color: #409eff;
+  border-color: var(--ops-primary);
   box-shadow: 0 2px 8px rgba(31, 45, 61, .08);
 }
 
@@ -622,7 +622,7 @@ function formatTime(value) {
 .type-card .type-option > span {
   display: block;
   margin-top: 5px;
-  color: #303133;
+  color: var(--ops-text);
   font-size: 12px;
   line-height: 18px;
   text-align: center;

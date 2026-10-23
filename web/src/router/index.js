@@ -15,52 +15,11 @@ const staticRoutes = [
     component: () => import('../views/Layout.vue'),
     redirect: '/dashboard',
     children: [
-      { path: 'chat', redirect: '/dashboard' },
-      { path: 'settings/mcp', redirect: '/dashboard' },
-      { path: 'inspection', redirect: '/inspection/items' },
       {
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('../views/Dashboard.vue'),
         meta: { title: '仪表盘' },
-      },
-      {
-        path: 'monitor/datasources',
-        redirect: '/integrations/sources',
-      },
-      {
-        path: 'integrations/workspaces',
-        redirect: '/integrations/sources?tab=workspaces',
-      },
-      {
-        path: 'monitor/dashboards',
-        redirect: '/dashboards/grafana',
-      },
-      {
-        path: 'scripts',
-        redirect: '/automation/scripts',
-      },
-      {
-        path: 'system/git-credentials',
-        redirect: '/settings/git-credentials',
-      },
-      {
-        path: 'executors',
-        redirect: '/nodes',
-      },
-      {
-        path: 'automation/nodes',
-        redirect: '/nodes',
-      },
-      {
-        path: 'inspection/workflows',
-        redirect: '/automation/workflows',
-      },
-      { path: 'inspection/probe', redirect: '/inspection/items/create' },
-      { path: 'automation/scheduled-tasks', redirect: '/inspection/items' },
-      {
-        path: 'inspection/scheduled-tasks',
-        redirect: '/inspection/items',
       },
       {
         path: 'inspection/items/groups/:groupId',
@@ -156,6 +115,7 @@ const componentMap = {
   'system/APITokenManage': () => import('../views/system/APITokenManage.vue'),
   'monitor/IntegrationManage': () => import('../views/monitor/IntegrationManage.vue'),
   'monitor/DashboardManage': () => import('../views/monitor/DashboardManage.vue'),
+  'monitor/DashboardHub': () => import('../views/monitor/DashboardHub.vue'),
   'monitor/GrafanaDashboardManage': () => import('../views/monitor/GrafanaDashboardManage.vue'),
   'monitor/SLSDashboardManage': () => import('../views/monitor/SLSDashboardManage.vue'),
   'monitor/CloudMonitorDashboardManage': () => import('../views/monitor/CloudMonitorDashboardManage.vue'),
@@ -165,12 +125,12 @@ const componentMap = {
   'notification/TemplateManage': () => import('../views/notification/TemplateManage.vue'),
   'notification/RecordManage': () => import('../views/notification/RecordManage.vue'),
   'security/AuditLog': () => import('../views/security/AuditLog.vue'),
-  'alert/RuleManage': () => import('../views/alert/RuleGroupList.vue'),
+  'alert/RuleGroupList': () => import('../views/alert/RuleGroupList.vue'),
   'alert/AlertCenter': () => import('../views/alert/AlertCenter.vue'),
   'certificate/ExecutorManage': () => import('../views/certificate/ExecutorManage.vue'),
   'automation/ScriptLibrary': () => import('../views/automation/ScriptLibrary.vue'),
 	'automation/AutomationTaskManage': () => import('../views/automation/AutomationTaskManage.vue'),
-  'inspection/InspectionManage': () => import('../views/inspection/InspectionRuleGroupList.vue'),
+  'inspection/InspectionRuleGroupList': () => import('../views/inspection/InspectionRuleGroupList.vue'),
   'inspection/WorkflowManage': () => import('../views/inspection/WorkflowManage.vue'),
   'inspection/ExecutionRecords': () => import('../views/inspection/ExecutionRecords.vue'),
 }
@@ -184,7 +144,6 @@ function resetDynamicRoutes() {
 function addDynamicRoutes(menus) {
   const addRouteFromMenu = (items, parentPath = '') => {
     items.forEach((menu) => {
-      if (menu.path === '/chat' || menu.component === 'Chat') return
       if (menu.type === 2 && menu.component) {
         const routePath = menu.path.replace(/^\//, '')
         const removeRoute = router.addRoute('Layout', {

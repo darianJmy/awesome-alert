@@ -501,7 +501,8 @@ func CreateInspectionItem(c *gin.Context) {
 	req.ExternalLabels = labels
 	req.Severity = normalizeInspectionSeverity(req.Severity)
 	if req.GroupID == 0 {
-		req.GroupID = 1
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请选择拨测规则组"})
+		return
 	}
 	if err := validateInspectionItemReq(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})

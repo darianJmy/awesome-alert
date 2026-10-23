@@ -1284,7 +1284,6 @@ type promAlertPersistenceMetadata struct {
 
 func promAlertNeedsPersistence(alert models.AlertInstance, next promAlertPersistenceMetadata) bool {
 	return alert.FaultCenterID != next.FaultCenterID ||
-		promAlertSnapshotFingerprint(alert.LastResult) != next.Fingerprint ||
 		promAlertSnapshotDatasourceLabels(alert.LastResult) != next.DatasourceLabels ||
 		alert.Fingerprint != next.Fingerprint ||
 		alert.Title != next.Title ||
@@ -1305,14 +1304,6 @@ func promAlertSnapshotDatasourceLabels(value string) string {
 	}
 	encoded, _ := json.Marshal(snapshot.DatasourceLabels)
 	return string(encoded)
-}
-
-func promAlertSnapshotFingerprint(value string) string {
-	var snapshot struct {
-		Fingerprint string `json:"fingerprint"`
-	}
-	_ = json.Unmarshal([]byte(value), &snapshot)
-	return snapshot.Fingerprint
 }
 
 func promDatasourceLabels(datasource models.Datasource) map[string]string {

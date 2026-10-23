@@ -33,12 +33,12 @@ function changeTab(tab) {
 </script>
 
 <style scoped>
-.integration-page { --integration-border: #e0e7ef; overflow: hidden; border: 1px solid var(--integration-border); border-radius: 7px; background: #fff; }
-.integration-tabs :deep(.el-tabs__header) { margin: 0; padding: 0 22px; border-bottom: 1px solid #edf0f4; }
+.integration-page { --integration-border: var(--ops-border); overflow: hidden; border: 1px solid var(--integration-border); border-radius: 7px; background: var(--ops-surface); }
+.integration-tabs :deep(.el-tabs__header) { margin: 0; padding: 0 22px; border-bottom: 1px solid var(--ops-border-soft); }
 .integration-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
-.integration-tabs :deep(.el-tabs__item) { height: 52px; padding: 0 21px; color: #66758a; font-size: 13px; }
-.integration-tabs :deep(.el-tabs__item.is-active) { color: #1769d2; font-weight: 600; }
-.integration-tabs :deep(.el-tabs__active-bar) { height: 2px; background: #1769d2; }
+.integration-tabs :deep(.el-tabs__item) { height: 52px; padding: 0 21px; color: var(--ops-muted); font-size: 13px; }
+.integration-tabs :deep(.el-tabs__item.is-active) { color: var(--ops-primary); font-weight: 600; }
+.integration-tabs :deep(.el-tabs__active-bar) { height: 2px; background: var(--ops-primary); }
 .integration-tabs :deep(.el-tabs__content) { overflow: visible; padding: 20px 22px 24px; }
 .integration-tabs :deep(.datasource-table-card) { border: 0; border-radius: 0; }
 .integration-tabs :deep(.datasource-table-card .el-card__body) { padding: 0; }

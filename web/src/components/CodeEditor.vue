@@ -4,6 +4,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useThemeColors } from '../theme/useThemeColors'
 import * as monaco from 'monaco-editor/editor/editor.api'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 import 'monaco-editor/languages/definitions/python/register'
@@ -17,6 +18,22 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 const container = ref()
+const themeColors = useThemeColors()
+function updateEditorTheme() {
+  monaco.editor.defineTheme('guanlan', {
+    base: document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': themeColors.value.surface,
+      'editor.foreground': themeColors.value.text,
+      'editorLineNumber.foreground': themeColors.value.muted,
+      'editorCursor.foreground': themeColors.value.primary,
+    },
+  })
+  monaco.editor.setTheme('guanlan')
+}
+watch(themeColors, updateEditorTheme)
 let editor
 let contentSubscription
 
@@ -39,10 +56,11 @@ if (!monaco.languages.getLanguages().some(item => item.id === 'yaml')) {
 }
 
 onMounted(() => {
+  updateEditorTheme()
   editor = monaco.editor.create(container.value, {
     value: props.modelValue,
     language: props.language,
-    theme: 'vs-dark',
+    theme: 'guanlan',
     automaticLayout: true,
     ariaLabel: props.ariaLabel,
     fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
@@ -74,6 +92,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.code-editor { width: 100%; overflow: hidden; border: 1px solid #d8dee8; border-radius: 7px; }
-.code-editor:focus-within { border-color: #409eff; box-shadow: 0 0 0 1px #409eff inset; }
+.code-editor { width: 100%; overflow: hidden; border: 1px solid var(--ops-border); border-radius: 7px; }
+.code-editor:focus-within { border-color: var(--ops-primary); box-shadow: 0 0 0 1px var(--ops-primary) inset; }
 </style>

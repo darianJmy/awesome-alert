@@ -35,7 +35,7 @@ func ListSLSDashboardProjects(c *gin.Context) {
 		provider := normalizeLogDashboardProvider(project.Provider)
 		data = append(data, slsDashboardProjectView{
 			ID: project.ID, Provider: provider, Name: project.Name, Project: project.Project, Region: project.Region, RoleArn: project.RoleArn,
-			Description: project.Description, Sort: project.Sort,
+			Description: project.Description, Sort: project.Sort, CreatedAt: project.CreatedAt,
 			CredentialsConfigured: project.AccessKeyIDCipher != "" && project.AccessKeySecretCipher != "",
 		})
 	}

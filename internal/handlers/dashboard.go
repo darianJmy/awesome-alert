@@ -58,7 +58,10 @@ func CreateDashboard(c *gin.Context) {
 		Sort:        req.Sort,
 		Status:      req.Status,
 	}
-	database.DB.Create(&d)
+	if err := createDashboardAtFront(&d); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建仪表盘失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "创建成功"})
 }
 

@@ -124,10 +124,6 @@ func DeleteInspectionRuleGroup(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "规则组不存在"})
 		return
 	}
-	if group.ID == 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "默认规则组不能删除"})
-		return
-	}
 	var ruleCount int64
 	if err := database.DB.Model(&models.InspectionItem{}).Where("group_id = ?", group.ID).Count(&ruleCount).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "检查组内任务失败"})

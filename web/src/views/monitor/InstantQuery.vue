@@ -195,6 +195,8 @@
 </template>
 
 <script setup>
+import { useThemeColors } from '../../theme/useThemeColors'
+const themeColors = useThemeColors()
 import DrawerBackButton from '../../components/DrawerBackButton.vue'
 import { ref, reactive, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { promInstantQuery, promRangeQuery, getPromDatasources, promMetadata, getPromQueryHistory, clearPromQueryHistory } from '../../api/prometheus'
@@ -750,10 +752,10 @@ function toggleMetric(index, event) {
 
 const chartOption = computed(() => ({
   color: chartColors,
-  tooltip: { trigger: 'axis', formatter(p) { let h = `<small>${new Date(p[0].data[0]).toLocaleString()}</small><br/>`; p.forEach(i => h += `${i.marker} ${i.seriesName}: <b>${i.data[1]}</b><br/>`); return h }},
+  tooltip: { backgroundColor: themeColors.value.surface, borderColor: themeColors.value.border, textStyle: { color: themeColors.value.text }, trigger: 'axis', formatter(p) { let h = `<small>${new Date(p[0].data[0]).toLocaleString()}</small><br/>`; p.forEach(i => h += `${i.marker} ${i.seriesName}: <b>${i.data[1]}</b><br/>`); return h }},
   grid: { left: 60, right: 20, top: 10, bottom: 32 },
-  xAxis: { type: 'time' },
-  yAxis: { type: 'value', axisLabel: { formatter: v => formatValue(v) } },
+  xAxis: { type: 'time', axisLabel: { color: themeColors.value.muted }, axisLine: { lineStyle: { color: themeColors.value.border } } },
+  yAxis: { type: 'value', axisLabel: { color: themeColors.value.muted, formatter: v => formatValue(v) }, splitLine: { lineStyle: { color: themeColors.value['border-soft'] } } },
   dataZoom: [{ type: 'inside' }],
   series: visibleChartSeries.value,
 }))
@@ -781,13 +783,13 @@ const chartOption = computed(() => ({
 .datasource-select :deep(.el-select__wrapper) {
   min-height: 36px;
   padding: 3px 11px;
-  background: #fff;
+  background: var(--ops-surface);
   border-radius: 4px;
-  box-shadow: 0 0 0 1px #dcdfe6 inset;
+  box-shadow: 0 0 0 1px var(--ops-border) inset;
   transition: box-shadow .16s ease;
 }
 .datasource-select :deep(.el-select__wrapper.is-focused) {
-  box-shadow: 0 0 0 1px #409eff inset;
+  box-shadow: 0 0 0 1px var(--ops-primary) inset;
 }
 .datasource-select :deep(.el-select__tags-text) {
   max-width: 190px;
@@ -800,23 +802,23 @@ const chartOption = computed(() => ({
   height: 36px;
   margin-left: auto;
   padding: 0;
-  color: #526176;
-  background: #fff;
-  border-color: #dcdfe6;
+  color: var(--ops-muted);
+  background: var(--ops-surface);
+  border-color: var(--ops-border);
   border-radius: 6px;
 }
 .history-button:hover,
 .history-button:focus-visible {
-  color: #409eff;
+  color: var(--ops-primary);
   border-color: #a8cdf7;
-  background: #f4f9ff;
+  background: var(--ops-primary-soft);
 }
 .history-icon {
   width: 16px;
   height: 16px;
   fill: currentColor;
 }
-.toolbar-label { font-size: 13px; font-weight: 500; color: #606266; white-space: nowrap; }
+.toolbar-label { font-size: 13px; font-weight: 500; color: var(--ops-muted); white-space: nowrap; }
 
 /* ── 查询输入行 ── */
 .query-run-row { display: flex; align-items: flex-start; gap: 8px; }
@@ -830,13 +832,13 @@ const chartOption = computed(() => ({
   align-items: stretch;
   min-height: 40px;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid #dcdfe6;
+  background: var(--ops-surface);
+  border: 1px solid var(--ops-border);
   border-radius: 6px;
   transition: border-color .16s ease, box-shadow .16s ease;
 }
 .input-shell:focus-within {
-  border-color: #409eff;
+  border-color: var(--ops-primary);
   box-shadow: 0 0 0 2px rgba(64, 158, 255, .12);
 }
 .input-leading {
@@ -845,9 +847,9 @@ const chartOption = computed(() => ({
   justify-content: center;
   width: 42px;
   flex: 0 0 42px;
-  color: #6b7280;
-  background: #fafafa;
-  border-right: 1px solid #ebeef5;
+  color: var(--ops-muted);
+  background: var(--ops-surface-soft);
+  border-right: 1px solid var(--ops-border-soft);
 }
 .promql-input {
   flex: 1;
@@ -858,51 +860,41 @@ const chartOption = computed(() => ({
   font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
   font-size: 14px;
   line-height: 1.5;
-  color: #303133;
+  color: var(--ops-text);
   resize: none;
   overflow: hidden;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--ops-surface);
 }
-.promql-input::placeholder { color: #c0c4cc; font-family: inherit; }
+.promql-input::placeholder { color: var(--ops-subtle); font-family: inherit; }
 .execute-button { flex: 0 0 auto; min-height: 40px; }
-/* legacy class retained for old DOM-free hot reloads */
-.input-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: #fafbfc;
-  border-left: 1px solid #e4e7ed;
-  border-radius: 0 8px 8px 0;
-}
 
 /* ── 自动补全 ── */
 .autocomplete-dropdown {
   position: fixed; z-index: 9999; width: 360px; max-height: 240px; overflow-y: auto;
-  background: #fff; border: 1px solid #e4e7ed; border-radius: 8px;
+  background: var(--ops-surface); border: 1px solid var(--ops-border); border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.12);
 }
-.suggest-loading, .suggest-empty { padding: 12px 16px; font-size: 13px; color: #909399; }
+.suggest-loading, .suggest-empty { padding: 12px 16px; font-size: 13px; color: var(--ops-muted); }
 .suggest-item { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 13px; font-family: 'SF Mono', monospace; cursor: pointer; transition: background 0.1s; }
-.suggest-item:hover, .suggest-item.active { background: #ecf5ff; }
-.suggest-type-icon { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; color: #fff; background: #409EFF; }
+.suggest-item:hover, .suggest-item.active { background: var(--ops-primary-soft); }
+.suggest-type-icon { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; color: #fff; background: var(--ops-primary); }
 .suggest-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggest-text .matched {
-  color: #1677ff;
+  color: var(--ops-primary);
   font-weight: 700;
 }
 
 /* ── 结果 ── */
-.result-panel { background: #fff; }
-.result-tabs { display: flex; align-items: center; border-bottom: 1px solid #dcdfe6; }
+.result-panel { background: var(--ops-surface); }
+.result-tabs { display: flex; align-items: center; border-bottom: 1px solid var(--ops-border); }
 .tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 38px;
   padding: 0 14px;
-  color: #606266;
+  color: var(--ops-muted);
   cursor: pointer;
   background: transparent;
   border: 0;
@@ -910,9 +902,9 @@ const chartOption = computed(() => ({
   font-size: 14px;
   transition: color .16s ease, border-color .16s ease;
 }
-.tab:hover { color: #409EFF; }
-.tab.active { color: #409EFF; border-bottom-color: #409EFF; font-weight: 500; }
-.tab-meta { margin-left: auto; padding-right: 16px; font-size: 12px; color: #909399; display: flex; gap: 16px; }
+.tab:hover { color: var(--ops-primary); }
+.tab.active { color: var(--ops-primary); border-bottom-color: var(--ops-primary); font-weight: 500; }
+.tab-meta { margin-left: auto; padding-right: 16px; font-size: 12px; color: var(--ops-muted); display: flex; gap: 16px; }
 .result-content { padding-top: 12px; }
 
 .panel-toolbar {
@@ -926,9 +918,9 @@ const chartOption = computed(() => ({
   display: inline-flex;
   align-items: center;
   overflow: hidden;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--ops-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--ops-surface);
 }
 .eval-control :deep(.el-button) {
   width: 36px;
@@ -941,29 +933,29 @@ const chartOption = computed(() => ({
 .eval-picker :deep(.el-input__wrapper) {
   border-radius: 0;
   box-shadow: none;
-  border-left: 1px solid #ebeef5;
-  border-right: 1px solid #ebeef5;
+  border-left: 1px solid var(--ops-border-soft);
+  border-right: 1px solid var(--ops-border-soft);
 }
 
 .error-box, .warning-box { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 6px; }
-.error-box { color: #F56C6C; background: #fef0f0; }
-.warning-box { margin-bottom: 8px; color: #b88230; background: #fdf6ec; }
+.error-box { color: var(--ops-danger); background: var(--el-color-danger-light-9); }
+.warning-box { margin-bottom: 8px; color: #b88230; background: var(--el-color-warning-light-9); }
 .query-alert {
   margin-top: 2px;
   padding: 14px 16px;
-  color: #409eff;
+  color: var(--ops-primary);
   font-size: 14px;
-  background: #f7fbff;
+  background: var(--ops-primary-soft);
   border-radius: 6px;
 }
 
 .query-result-table :deep(.el-table__cell .cell) { white-space: nowrap; }
 .metric-cell, .value-cell, .result-source { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.metric-cell { font-family: 'SF Mono', monospace; font-size: 13px; color: #303133; }
-.result-source { max-width: 100%; color: #606266; font-size: 13px; line-height: 20px; }
-.value-cell { font-family: 'SF Mono', monospace; font-size: 13px; font-weight: 500; color: #303133; text-align: right; }
+.metric-cell { font-family: 'SF Mono', monospace; font-size: 13px; color: var(--ops-text); }
+.result-source { max-width: 100%; color: var(--ops-muted); font-size: 13px; line-height: 20px; }
+.value-cell { font-family: 'SF Mono', monospace; font-size: 13px; font-weight: 500; color: var(--ops-text); text-align: right; }
 
-.empty-chart { display: flex; align-items: center; justify-content: center; height: 300px; color: #909399; font-size: 13px; }
+.empty-chart { display: flex; align-items: center; justify-content: center; height: 300px; color: var(--ops-muted); font-size: 13px; }
 
 /* ── Graph params ── */
 .graph-params {
@@ -979,7 +971,7 @@ const chartOption = computed(() => ({
 /* ── Metric legend ── */
 .metric-legend {
   padding: 4px 16px 0;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--ops-border-soft);
 }
 .metric-legend-header {
   display: grid;
@@ -987,8 +979,8 @@ const chartOption = computed(() => ({
   gap: 10px;
   min-height: 32px;
   align-items: center;
-  color: #909399;
-  border-bottom: 1px solid #ebeef5;
+  color: var(--ops-muted);
+  border-bottom: 1px solid var(--ops-border-soft);
   font-size: 12px;
   font-weight: 500;
 }
@@ -1005,16 +997,16 @@ const chartOption = computed(() => ({
   cursor: pointer;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #f2f3f5;
+  border-bottom: 1px solid var(--ops-border-soft);
   transition: background-color .16s ease, opacity .16s ease;
 }
-.metric-legend-item:hover { background: #f7faff; }
-.metric-legend-item.active { background: #eef5ff; }
+.metric-legend-item:hover { background: var(--ops-primary-soft); }
+.metric-legend-item.active { background: var(--ops-primary-soft); }
 .metric-legend-item.muted { opacity: .38; }
 .metric-legend-item:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid #409eff;
+  outline: 2px solid var(--ops-primary);
   outline-offset: -2px;
 }
 .metric-legend-item:last-child { border-bottom: 0; }
@@ -1040,7 +1032,7 @@ const chartOption = computed(() => ({
   width: 180px;
   flex: 0 0 180px;
   overflow: hidden;
-  color: #606266;
+  color: var(--ops-muted);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1049,7 +1041,7 @@ const chartOption = computed(() => ({
   flex: 1;
   min-width: 0;
   padding: 6px 0;
-  color: #606266;
+  color: var(--ops-muted);
   font-family: 'SF Mono', monospace;
   font-size: 12px;
   line-height: 18px;
@@ -1069,7 +1061,7 @@ const chartOption = computed(() => ({
   justify-content: space-between;
 }
 .history-drawer-header strong {
-  color: #1f2937;
+  color: var(--ops-text);
   font-size: 16px;
 }
 .history-list {
@@ -1083,10 +1075,10 @@ const chartOption = computed(() => ({
   flex-direction: column;
   gap: 9px;
   padding: 12px 14px;
-  color: #303133;
+  color: var(--ops-text);
   text-align: left;
-  background: #fff;
-  border: 1px solid #e4e7ed;
+  background: var(--ops-surface);
+  border: 1px solid var(--ops-border);
   border-radius: 8px;
   cursor: pointer;
   transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
@@ -1095,7 +1087,7 @@ const chartOption = computed(() => ({
 .history-item:focus-visible {
   outline: none;
   border-color: #9fc8f7;
-  background: #f7fbff;
+  background: var(--ops-primary-soft);
   box-shadow: 0 4px 12px rgba(64, 158, 255, .08);
 }
 .history-query {
@@ -1109,7 +1101,7 @@ const chartOption = computed(() => ({
   min-width: 0;
   align-items: center;
   gap: 8px;
-  color: #909399;
+  color: var(--ops-muted);
   font-size: 11px;
 }
 .history-meta > span:not(.el-tag) {

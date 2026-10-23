@@ -134,13 +134,9 @@ func TestPromAlertPersistenceIgnoresChangingSampleValue(t *testing.T) {
 	if promAlertNeedsPersistence(alert, metadata) {
 		t.Fatal("a new sample value alone must not rewrite the active alert row")
 	}
-	alert.LastResult = `{"datasource_labels":{"cluster":"prod-a"},"value":"0.8"}`
-	if !promAlertNeedsPersistence(alert, metadata) {
-		t.Fatal("a legacy snapshot missing top-level fingerprint must be migrated once")
-	}
 	alert.LastResult = `{"fingerprint":"fingerprint","datasource_labels":{"cluster":"prod-a","env":"prod","region":"cn-east","domain":"payments","datasource":"prod-prometheus"},"value":"0.8"}`
 	if !promAlertNeedsPersistence(alert, metadata) {
-		t.Fatal("legacy injected datasource fields must be removed on the next evaluation")
+		t.Fatal("changed datasource labels must be persisted")
 	}
 	alert.LastResult = `{"fingerprint":"fingerprint","datasource_labels":{"cluster":"prod-a"},"value":"0.8"}`
 	metadata.Status = alertStatusResolved

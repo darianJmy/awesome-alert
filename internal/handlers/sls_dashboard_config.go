@@ -7,21 +7,23 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type slsDashboardProjectView struct {
-	ID                    uint   `json:"id"`
-	Provider              string `json:"provider"`
-	Name                  string `json:"name"`
-	Project               string `json:"project"`
-	Region                string `json:"region"`
-	RoleArn               string `json:"role_arn"`
-	Description           string `json:"description"`
-	Sort                  int    `json:"sort"`
-	CredentialsConfigured bool   `json:"credentials_configured"`
+	CreatedAt             time.Time `json:"created_at"`
+	ID                    uint      `json:"id"`
+	Provider              string    `json:"provider"`
+	Name                  string    `json:"name"`
+	Project               string    `json:"project"`
+	Region                string    `json:"region"`
+	RoleArn               string    `json:"role_arn"`
+	Description           string    `json:"description"`
+	Sort                  int       `json:"sort"`
+	CredentialsConfigured bool      `json:"credentials_configured"`
 }
 
 type slsDashboardProjectReq struct {
@@ -56,20 +58,12 @@ func CreateSLSDashboardProject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "AccessKey 加密失败"})
 		return
 	}
-	var order struct {
-		MaxSort int `gorm:"column:max_sort"`
-	}
-	if err := database.DB.Model(&models.SLSDashboardProject{}).Select("COALESCE(MAX(sort), -1) AS max_sort").Scan(&order).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "读取 SLS 项目排序失败"})
-		return
-	}
 	project := models.SLSDashboardProject{
 		Provider: normalizeLogDashboardProvider(req.Provider), Name: strings.TrimSpace(req.Name), Project: strings.TrimSpace(req.Project), Region: strings.TrimSpace(req.Region),
 		RoleArn:           strings.TrimSpace(req.RoleArn),
 		AccessKeyIDCipher: accessKeyIDCipher, AccessKeySecretCipher: accessKeySecretCipher, Description: strings.TrimSpace(req.Description),
-		Sort: order.MaxSort + 1,
 	}
-	if err := database.DB.Create(&project).Error; err != nil {
+	if err := createDashboardAtFront(&project); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建 SLS 项目失败"})
 		return
 	}

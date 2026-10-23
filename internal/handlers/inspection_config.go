@@ -274,7 +274,7 @@ func inspectionTaskConfigRequest(task inspectionTaskConfigEntry) (CreateInspecti
 		return CreateInspectionItemReq{}, fmt.Errorf("额外标签无法转换为内部格式")
 	}
 	if task.GroupID == 0 {
-		task.GroupID = 1
+		return CreateInspectionItemReq{}, fmt.Errorf("请指定拨测规则组 group_id，或选择导入目标规则组")
 	}
 	request := CreateInspectionItemReq{
 		GroupID: task.GroupID,
