@@ -78,7 +78,7 @@ func testSupportedMonitoringAPI(t *testing.T, kind string) {
 		endpoint += "/select/42/prometheus"
 	}
 	valid := map[string]interface{}{"name": "prod", "type": kind, "url": endpoint, "auth_type": "bearer", "auth_config": `{"token":"secret"}`, "config": `{"custom_headers":{"X-Scope-OrgID":"prod"}}`, "labels": `{"env":"prod"}`, "status": 1}
-	for _, kind := range []string{"mysql", "postgresql", "redis", "k8s", "aliyun_ecs", "sls", "cls", "nacos", "kafka", "loki", "http", "unknown"} {
+	for _, kind := range []string{"mysql", "postgresql", "redis", "k8s", "aliyun_ecs", "sls", "cls", "nacos", "kafka", "http", "unknown"} {
 		valid["type"] = kind
 		_, body := call(http.MethodPost, "/sources", valid)
 		if body["code"] == float64(0) {

@@ -910,7 +910,7 @@ func evaluateAlertRuleBinding(bindingID uint, evaluatedAt time.Time) {
 	if rule.Status != 1 || datasource.Status != 1 || !isMetricDatasourceType(datasource.Type) {
 		return
 	}
-	series, err := queryPromRuleDatasource(datasource, rule.Expression, evaluatedAt)
+	series, err := queryPromRuleDatasource(datasource, rule.Expression)
 	durationMS := time.Since(started).Milliseconds()
 	status, message := "success", ""
 	if err != nil {
@@ -934,10 +934,11 @@ func evaluateAlertRuleBinding(bindingID uint, evaluatedAt time.Time) {
 	}
 }
 
-func queryPromRuleDatasource(datasource models.Datasource, expression string, evaluatedAt time.Time) ([]promVectorSeries, error) {
+func queryPromRuleDatasource(datasource models.Datasource, expression string) ([]promVectorSeries, error) {
 	params := url.Values{}
 	params.Set("query", expression)
-	params.Set("time", strconv.FormatInt(evaluatedAt.Unix(), 10))
+	// Let the datasource evaluate at its own current time. Local evaluation
+	// timestamps are only used for scheduling and alert lifecycle durations.
 	queryPath := "/api/v1/query"
 	var config struct {
 		QueryPath   string            `json:"query_path"`

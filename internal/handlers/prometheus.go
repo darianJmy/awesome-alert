@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"guanlan/internal/database"
@@ -45,7 +46,7 @@ func PromInstantQuery(c *gin.Context) {
 	}
 	apiURL := fmt.Sprintf("%s/api/v1/query?%s", strings.TrimRight(ds.URL, "/"), params.Encode())
 
-	body, err := doPromHTTP(ds, apiURL)
+	body, err := doPromHTTPContext(c.Request.Context(), ds, apiURL)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": 1, "message": err.Error()})
 		return
@@ -84,7 +85,7 @@ func PromRangeQuery(c *gin.Context) {
 	params.Set("step", req.Step)
 	apiURL := fmt.Sprintf("%s/api/v1/query_range?%s", strings.TrimRight(ds.URL, "/"), params.Encode())
 
-	body, err := doPromHTTP(ds, apiURL)
+	body, err := doPromHTTPContext(c.Request.Context(), ds, apiURL)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": 1, "message": err.Error()})
 		return
@@ -124,7 +125,7 @@ func PromMetadata(c *gin.Context) {
 		return
 	}
 
-	body, err := doPromHTTP(ds, apiURL)
+	body, err := doPromHTTPContext(c.Request.Context(), ds, apiURL)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": 1, "message": err.Error()})
 		return
@@ -191,12 +192,20 @@ func getPromDatasource(id uint) (models.Datasource, error) {
 }
 
 func doPromHTTP(ds models.Datasource, apiURL string) ([]byte, error) {
+	return doPromHTTPContext(context.Background(), ds, apiURL)
+}
+
+func doPromHTTPContext(ctx context.Context, ds models.Datasource, apiURL string) ([]byte, error) {
 	client, cleanup, err := datasourceHTTPClient(ds, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
 	defer cleanup()
-	resp, err := client.Get(apiURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("请求 Prometheus 失败: %s", err.Error())
 	}

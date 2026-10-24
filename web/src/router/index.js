@@ -15,6 +15,10 @@ const staticRoutes = [
     component: () => import('../views/Layout.vue'),
     redirect: '/dashboard',
     children: [
+      { path: 'explore', redirect: '/monitor/query' },
+      { path: 'observability/logs', redirect: '/monitor/query?kind=logs' },
+      { path: 'observability/traces', redirect: '/monitor/query?kind=traces' },
+      { path: 'observability', redirect: '/monitor/query' },
       {
         path: 'dashboard',
         name: 'Dashboard',
@@ -119,6 +123,8 @@ const componentMap = {
   'monitor/GrafanaDashboardManage': () => import('../views/monitor/GrafanaDashboardManage.vue'),
   'monitor/SLSDashboardManage': () => import('../views/monitor/SLSDashboardManage.vue'),
   'monitor/CloudMonitorDashboardManage': () => import('../views/monitor/CloudMonitorDashboardManage.vue'),
+  'monitor/LogQuery': () => import('../views/monitor/LogQuery.vue'),
+  'monitor/Explore': () => import('../views/monitor/Explore.vue'),
   'monitor/InstantQuery': () => import('../views/monitor/InstantQuery.vue'),
   'common/FeaturePlaceholder': () => import('../views/common/FeaturePlaceholder.vue'),
   'notification/ChannelManage': () => import('../views/notification/ChannelManage.vue'),

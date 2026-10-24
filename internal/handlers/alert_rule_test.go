@@ -3,10 +3,34 @@ package handlers
 import (
 	"encoding/json"
 	"guanlan/internal/models"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestQueryPromRuleDatasourceUsesDatasourceCurrentTime(t *testing.T) {
+	const expression = `rate(node_cpu_seconds_total{mode="idle"}[5m])`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/query" || r.URL.Query().Get("query") != expression {
+			t.Errorf("unexpected query request: %s", r.URL)
+		}
+		if r.URL.Query().Has("time") {
+			t.Errorf("current alert query must not supply a local evaluation time: %s", r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"instance":"node-1"},"value":[1792770623,"100"]}]}}`))
+	}))
+	defer server.Close()
+	series, err := queryPromRuleDatasource(models.Datasource{URL: server.URL}, expression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(series) != 1 || series[0].Value != "100" || series[0].Labels["instance"] != "node-1" {
+		t.Fatalf("expected current datasource sample despite its different clock: %#v", series)
+	}
+}
 
 func TestRenderPromRuleTemplateSupportsLabelVariables(t *testing.T) {
 	labels := map[string]string{"job": "api", "instance": "10.0.0.8:9090"}

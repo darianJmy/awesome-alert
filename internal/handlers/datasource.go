@@ -652,23 +652,26 @@ func testJaeger(ds models.Datasource) (bool, string) {
 func testLoki(ds models.Datasource) (bool, string) {
 	client, cleanup, err := datasourceHTTPClient(ds, 5*time.Second)
 	if err != nil {
-		return false, err.Error()
+		return false, "无法连接 Loki 数据源"
 	}
 	defer cleanup()
-
-	endpoint := strings.TrimRight(ds.URL, "/") + "/loki/api/v1/label"
-	req, _ := http.NewRequest("GET", endpoint, nil)
-
-	resp, err := client.Do(req)
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Get(strings.TrimRight(ds.URL, "/") + "/loki/api/v1/labels")
 	if err != nil {
-		return false, "Loki 连接失败: " + err.Error()
+		return false, "Loki 连接失败或超时"
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		return true, "连接成功 (Loki)"
+	if resp.StatusCode != http.StatusOK {
+		return false, "Loki 返回异常状态码: " + strconv.Itoa(resp.StatusCode)
 	}
-	return false, "Loki 返回异常状态码: " + strconv.Itoa(resp.StatusCode)
+	var result struct {
+		Status string   `json:"status"`
+		Data   []string `json:"data"`
+	}
+	if json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&result) != nil || result.Status != "success" {
+		return false, "不是有效的 Loki 标签 API 响应"
+	}
+	return true, "连接成功 (Loki)"
 }
 
 // ── SLS (Alibaba Cloud) ──

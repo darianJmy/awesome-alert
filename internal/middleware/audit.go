@@ -158,7 +158,7 @@ func auditResource(path string) (string, string) {
 	}
 	items := map[string][2]string{
 		"users": {"用户管理", "user"}, "roles": {"角色管理", "role"}, "menus": {"菜单管理", "menu"},
-		"datasources": {"接入中心", "datasource"}, "datasource-groups": {"数据源分组", "workspace"}, "prometheus": {"即时查询", "prometheus_query"},
+		"datasources": {"接入中心", "datasource"}, "datasource-groups": {"数据源分组", "workspace"}, "prometheus": {"指标查询", "prometheus_query"}, "query": {"查询中心", "log_query"},
 		"dashboards": {"仪表盘", "dashboard"}, "cloud-monitor-workspaces": {"云监控2.0", "cloud_monitor_workspace"}, "inspection-items": {"拨测中心", "inspection_task"},
 		"instant-probe": {"拨测中心", "instant_probe"}, "scripts": {"自动化脚本库", "script"},
 		"workflows": {"工作流", "workflow"}, "scheduled-tasks": {"定时任务", "scheduled_task"},

@@ -19,6 +19,7 @@ func seedInitialData(db *gorm.DB) error {
 		return err
 	}
 	permissions := []models.Permission{
+		{ID: 67, Name: "SQL 查询", Code: "query:sql", Status: 1},
 		{ID: 1, Name: "用户列表", Code: "user:list", Status: 1},
 		{ID: 2, Name: "创建用户", Code: "user:create", Status: 1},
 		{ID: 3, Name: "编辑用户", Code: "user:edit", Status: 1},
@@ -100,14 +101,11 @@ func seedInitialData(db *gorm.DB) error {
 		{ID: 13, ParentID: 15, Name: "自动化任务", Path: "/automation/tasks", Component: "automation/AutomationTaskManage", Icon: "SetUp", Sort: 3, Type: 2, Permission: "automation-task:list", Status: 1},
 		{ID: 14, ParentID: 15, Name: "执行记录", Path: "/automation/records", Component: "inspection/ExecutionRecords", Icon: "Tickets", Sort: 5, Type: 2, Permission: "", Status: 1},
 		{ID: 15, ParentID: 0, Name: "自动化中心", Path: "/automation", Component: "", Icon: "Operation", Sort: 7, Type: 1, Permission: "", Status: 1},
-		{ID: 19, ParentID: 38, Name: "即时查询", Path: "/monitor/query", Component: "monitor/InstantQuery", Icon: "Search", Sort: 2, Type: 2, Permission: "", Status: 1},
+		{ID: 19, ParentID: 0, Name: "即时查询", Path: "/monitor/query", Component: "monitor/Explore", Icon: "Search", Sort: 2, Type: 2, Permission: "", Status: 1},
 		{ID: 24, ParentID: 87, Name: "节点管理", Path: "/nodes", Component: "certificate/ExecutorManage", Icon: "Monitor", Sort: 5, Type: 2, Permission: "certificate:executor:list", Status: 1},
-		{ID: 30, ParentID: 0, Name: "可观测中心", Path: "/observability", Component: "", Icon: "DataLine", Sort: 5, Type: 1, Permission: "", Status: 1},
-		{ID: 31, ParentID: 30, Name: "日志查询", Path: "/observability/logs", Component: "common/FeaturePlaceholder", Icon: "Document", Sort: 1, Type: 2, Permission: "observability:logs", Status: 1},
-		{ID: 32, ParentID: 30, Name: "链路追踪", Path: "/observability/traces", Component: "common/FeaturePlaceholder", Icon: "Share", Sort: 2, Type: 2, Permission: "observability:traces", Status: 1},
-		{ID: 38, ParentID: 0, Name: "告警中心", Path: "/alert-center", Component: "", Icon: "Bell", Sort: 4, Type: 1, Permission: "", Status: 1},
+		{ID: 38, ParentID: 0, Name: "告警中心", Path: "/alert-center", Component: "", Icon: "Bell", Sort: 3, Type: 1, Permission: "", Status: 1},
 		{ID: 39, ParentID: 38, Name: "告警管理", Path: "/alert-rules", Component: "alert/RuleGroupList", Icon: "Histogram", Sort: 1, Type: 2, Permission: "alert:rule:list", Status: 1},
-		{ID: 40, ParentID: 0, Name: "故障中心", Path: "/alerts", Component: "alert/AlertCenter", Icon: "OfficeBuilding", Sort: 3, Type: 2, Permission: "alert:event:list", Status: 1},
+		{ID: 40, ParentID: 0, Name: "故障中心", Path: "/alerts", Component: "alert/AlertCenter", Icon: "OfficeBuilding", Sort: 4, Type: 2, Permission: "alert:event:list", Status: 1},
 		{ID: 70, ParentID: 0, Name: "通知管理", Path: "/notifications", Component: "", Icon: "Message", Sort: 11, Type: 1, Permission: "", Status: 1},
 		{ID: 71, ParentID: 70, Name: "通知对象", Path: "/notifications/channels", Component: "notification/ChannelManage", Icon: "Promotion", Sort: 1, Type: 2, Permission: "notification:channel:list", Status: 1},
 		{ID: 72, ParentID: 70, Name: "通知模板", Path: "/notifications/templates", Component: "notification/TemplateManage", Icon: "Tickets", Sort: 2, Type: 2, Permission: "notification:template:list", Status: 1},

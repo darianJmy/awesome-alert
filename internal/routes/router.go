@@ -90,6 +90,12 @@ func SetupRouter() *gin.Engine {
 			auth.PUT("/datasource-groups/:id", handlers.UpdateDatasourceGroup)
 			auth.DELETE("/datasource-groups/:id", handlers.DeleteDatasourceGroup)
 
+			auth.GET("/query/datasources", handlers.ExploreDatasources)
+			auth.POST("/query/sql", middleware.RequirePermission("query:sql"), handlers.QuerySQL)
+			auth.POST("/query/traces", middleware.RequirePermission("observability:traces"), handlers.QueryTraces)
+			auth.GET("/query/logs/datasources", middleware.RequirePermission("observability:logs"), handlers.LogDatasources)
+			auth.POST("/query/logs", middleware.RequirePermission("observability:logs"), handlers.QueryLogs)
+
 			auth.POST("/prometheus/query", handlers.PromInstantQuery)
 			auth.POST("/prometheus/query_range", handlers.PromRangeQuery)
 			auth.GET("/prometheus/metadata", handlers.PromMetadata)

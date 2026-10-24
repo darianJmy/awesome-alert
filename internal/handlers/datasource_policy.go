@@ -59,7 +59,19 @@ func validateDatasourceConnection(ds models.Datasource) error {
 			}
 		}
 	}
-	return nil
+	if ds.Type == "clickhouse" {
+		var cfg struct {
+			Logs *logSourceConfig `json:"log_query"`
+		}
+		if json.Unmarshal([]byte(ds.Config), &cfg) == nil && cfg.Logs == nil {
+			return nil
+		}
+		if ds.Config == "" {
+			return nil
+		}
+	}
+	_, err = readLogSourceConfig(ds)
+	return err
 }
 
 func normalizeDatasourceReq(req *CreateDatasourceWithTunnelReq, existing *models.Datasource) error {

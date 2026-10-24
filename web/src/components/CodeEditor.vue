@@ -16,7 +16,7 @@ const props = defineProps({
   height: { type: String, default: '420px' },
   ariaLabel: { type: String, default: '代码编辑器' },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'execute'])
 const container = ref()
 const themeColors = useThemeColors()
 function updateEditorTheme() {
@@ -55,6 +55,22 @@ if (!monaco.languages.getLanguages().some(item => item.id === 'yaml')) {
   })
 }
 
+for (const language of ['promql', 'logql']) {
+  if (!monaco.languages.getLanguages().some(item => item.id === language)) {
+    monaco.languages.register({ id: language })
+    monaco.languages.setMonarchTokensProvider(language, { tokenizer: { root: [
+      [/#.*$/, 'comment'], [/"([^"\\]|\\.)*"/, 'string'],
+      [/\b(sum|avg|min|max|count|rate|irate|increase|by|without|on|ignoring|group_left|group_right|bool|and|or|unless|json|logfmt|line_format|unwrap|count_over_time|sum_over_time)\b/, 'keyword'],
+      [/\d+(?:\.\d+)?(?:ms|s|m|h|d|w|y)?/, 'number'], [/[{}()[\]]/, '@brackets'], [/[=!~|+*/<>-]+/, 'operator'], [/[a-zA-Z_:][\w:]*/, 'identifier'],
+    ] } })
+    monaco.languages.registerCompletionItemProvider(language, { provideCompletionItems(model, position) {
+      const word = model.getWordUntilPosition(position), range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn }
+      const words = language === 'promql' ? ['sum','avg','max','min','count','rate','irate','increase','histogram_quantile','by','without'] : ['json','logfmt','line_format','unwrap','count_over_time','rate']
+      return { suggestions: words.map(word => ({ label:word, kind:monaco.languages.CompletionItemKind.Function, insertText:word, range })) }
+    } })
+  }
+}
+
 onMounted(() => {
   updateEditorTheme()
   editor = monaco.editor.create(container.value, {
@@ -73,6 +89,7 @@ onMounted(() => {
     insertSpaces: true,
     wordWrap: 'on',
   })
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => emit('execute'))
   contentSubscription = editor.onDidChangeModelContent(() => emit('update:modelValue', editor.getValue()))
 })
 
@@ -87,7 +104,9 @@ watch(() => props.language, language => {
 
 onBeforeUnmount(() => {
   contentSubscription?.dispose()
+  const model = editor?.getModel()
   editor?.dispose()
+  model?.dispose()
 })
 </script>
 

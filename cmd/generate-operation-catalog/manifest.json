@@ -1801,6 +1801,31 @@
       "method": "POST",
       "path": "/agents/:id/rotate-token",
       "reason": "密码或一次性令牌需要安全交付，不能经模型上下文回传；保留账户/凭据页面操作"
+    },
+    {
+      "method": "GET",
+      "path": "/query/logs/datasources",
+      "reason": "日志查询首期仅开放交互页面，AI 日志工具待单独设计结果裁剪与查询上下文。"
+    },
+    {
+      "method": "POST",
+      "path": "/query/logs",
+      "reason": "原始日志可能包含大量业务数据，AI 日志工具待单独设计结果裁剪与查询上下文。"
+    },
+    {
+      "method": "GET",
+      "path": "/query/datasources",
+      "reason": "统一查询工作台交互接口，AI 工具输出结构与结果裁剪另行设计。"
+    },
+    {
+      "method": "POST",
+      "path": "/query/sql",
+      "reason": "统一查询工作台交互接口，AI 工具输出结构与结果裁剪另行设计。"
+    },
+    {
+      "method": "POST",
+      "path": "/query/traces",
+      "reason": "统一查询工作台交互接口，AI 工具输出结构与结果裁剪另行设计。"
     }
   ]
 }

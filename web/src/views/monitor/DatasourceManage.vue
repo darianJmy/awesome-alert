@@ -19,7 +19,7 @@
     <el-card class="datasource-table-card" shadow="never">
       <el-table :data="tableData" v-loading="loading" row-key="id" border @selection-change="selectedRows = $event" @sort-change="handleSortChange">
         <el-table-column type="selection" width="48" />
-        <el-table-column prop="name" label="实例名称" min-width="180" sortable="custom"><template #default="{ row }"><span class="instance-name"><img v-if="row.type === 'prometheus'" :src="prometheusLogo" alt="" /><img v-else-if="row.type === 'victoriametrics'" :src="victoriaMetricsLogo" alt="" class="vm-logo" /><el-icon v-else><Connection /></el-icon>{{ row.name }}</span></template></el-table-column>
+        <el-table-column prop="name" label="实例名称" min-width="180" sortable="custom"><template #default="{ row }"><span class="instance-name"><img v-if="row.type === 'prometheus'" :src="prometheusLogo" alt="" /><img v-else-if="row.type === 'victoriametrics'" :src="victoriaMetricsLogo" alt="" class="vm-logo" /><img v-else-if="row.type === 'loki'" :src="lokiLogo" alt="" class="loki-logo" /><img v-else-if="row.type === 'elasticsearch'" :src="elasticsearchLogo" alt="" class="log-source-logo" /><img v-else-if="row.type === 'clickhouse'" :src="clickhouseLogo" alt="" class="log-source-logo" /><img v-else-if="row.type === 'jaeger'" :src="jaegerLogo" alt="" class="jaeger-logo" /><el-icon v-else><Connection /></el-icon>{{ row.name }}</span></template></el-table-column>
         <el-table-column prop="type" label="类型" min-width="160"><template #default="{ row }">{{ typeDefinition(row.type).name || row.type }}</template></el-table-column>
         <el-table-column prop="url" label="接入地址" min-width="230" show-overflow-tooltip />
         <el-table-column label="标签" min-width="180"><template #default="{ row }"><span class="scope-tags"><el-tag v-for="(value, key) in parseObject(row.labels)" :key="key" size="small" effect="plain">{{ key }}:{{ value }}</el-tag></span></template></el-table-column>
@@ -43,6 +43,10 @@
             <button v-for="item in group.items" :key="item.type" type="button" class="type-card" :aria-label="`接入 ${item.name}`" @click="selectDatasourceType(item)">
               <img v-if="item.type === 'prometheus'" :src="prometheusLogo" alt="" class="type-card-logo" />
               <img v-else-if="item.type === 'victoriametrics'" :src="victoriaMetricsLogo" alt="" class="type-card-logo vm-logo" />
+              <img v-else-if="item.type === 'loki'" :src="lokiLogo" alt="" class="type-card-logo loki-logo" />
+              <img v-else-if="item.type === 'elasticsearch'" :src="elasticsearchLogo" alt="" class="type-card-logo log-source-logo" />
+              <img v-else-if="item.type === 'clickhouse'" :src="clickhouseLogo" alt="" class="type-card-logo log-source-logo" />
+              <img v-else-if="item.type === 'jaeger'" :src="jaegerLogo" alt="" class="type-card-logo jaeger-logo" />
               <el-icon v-else :size="26" color="#409eff"><Connection /></el-icon>
               <span class="type-card-name">{{ item.name }}</span>
               <span class="type-card-desc">{{ sourceDescription(item) }}</span>
@@ -53,14 +57,18 @@
       </div>
       <div v-else class="step2-wrapper">
         <div class="selected-type-banner">
-          <div class="selected-type-icon" :style="{ background: form.type === 'prometheus' ? '#fff3eb' : (form.type === 'victoriametrics' ? 'transparent' : '#ecf5ff') }">
+          <div class="selected-type-icon" :style="{ background: form.type === 'prometheus' ? '#fff3eb' : (['victoriametrics', 'loki', 'elasticsearch', 'clickhouse', 'jaeger'].includes(form.type) ? 'transparent' : '#ecf5ff') }">
             <img v-if="form.type === 'prometheus'" :src="prometheusLogo" alt="" class="selected-type-logo" />
             <img v-else-if="form.type === 'victoriametrics'" :src="victoriaMetricsLogo" alt="" class="selected-type-logo vm-logo" />
+            <img v-else-if="form.type === 'loki'" :src="lokiLogo" alt="" class="selected-type-logo loki-logo" />
+            <img v-else-if="form.type === 'elasticsearch'" :src="elasticsearchLogo" alt="" class="selected-type-logo log-source-logo" />
+            <img v-else-if="form.type === 'clickhouse'" :src="clickhouseLogo" alt="" class="selected-type-logo log-source-logo" />
+            <img v-else-if="form.type === 'jaeger'" :src="jaegerLogo" alt="" class="selected-type-logo jaeger-logo" />
             <el-icon v-else :size="22" color="#409eff"><Connection /></el-icon>
           </div>
           <div class="selected-type-text">
             <div class="selected-type-label">{{ selectedType.name }}</div>
-            <div class="selected-type-desc">可观测 / {{ sourceDescription(selectedType) }}</div>
+            <div class="selected-type-desc">{{ sourceGroupLabel(sourceGroup(selectedType)) }} / {{ sourceDescription(selectedType) }}</div>
           </div>
           <el-tag size="small" effect="plain">已选择</el-tag>
         </div>
@@ -70,8 +78,22 @@
         <el-form-item label="认证方式"><div class="auth-segmented" role="group" aria-label="认证方式"><button v-for="option in authOptions" :key="option.value" type="button" class="auth-seg" :class="{ active: form.auth_type === option.value }" :aria-pressed="form.auth_type === option.value" @click="form.auth_type = option.value">{{ option.label }}</button></div></el-form-item>
         <template v-if="form.auth_type === 'basic'"><el-form-item label="用户名"><el-input v-model="authFields.username" autocomplete="off" /></el-form-item><el-form-item label="密码"><el-input v-model="authFields.password" type="password" show-password :placeholder="canReuseAuth ? '留空保留已保存的密码' : '输入密码'" /></el-form-item></template>
         <el-form-item v-if="form.auth_type === 'bearer'" label="Token"><el-input v-model="authFields.token" type="password" show-password :placeholder="canReuseAuth ? '留空保留已保存的 Token' : '输入 Bearer Token'" /></el-form-item>
+        <el-form-item v-if="form.type === 'clickhouse'" label="启用日志字段映射"><el-switch v-model="logMappingEnabled" /><p class="field-help">SQL 查询无需映射；开启后可同时使用日志视图。</p></el-form-item>
+        <template v-if="hasLogMapping">
+          <el-divider content-position="left">日志查询配置</el-divider>
+          <el-form-item v-if="form.type === 'elasticsearch'" label="索引 / 索引模式" required><el-input v-model="logConfig.index" placeholder="logs-*" maxlength="512" /><p class="field-help">支持通配符和逗号分隔的索引，例如 logs-*,app-logs-*。</p></el-form-item>
+          <template v-if="form.type === 'clickhouse'">
+            <el-form-item label="数据库" required><el-input v-model="logConfig.database" placeholder="default" maxlength="128" /></el-form-item>
+            <el-form-item label="日志表" required><el-input v-model="logConfig.table" placeholder="otel_logs" maxlength="128" /></el-form-item>
+          </template>
+          <el-form-item label="时间字段" required><el-input v-model="logConfig.timestamp_field" maxlength="128" /><p class="field-help">{{ form.type === 'clickhouse' ? '支持 DateTime / DateTime64 类型。' : '使用 date / date_nanos 类型，需启用 doc_values。' }}</p></el-form-item>
+          <el-form-item label="日志正文字段" required><el-input v-model="logConfig.message_field" maxlength="128" /></el-form-item>
+          <el-form-item label="服务字段"><el-input v-model="logConfig.service_field" placeholder="可选" maxlength="128" /></el-form-item>
+          <el-form-item label="级别字段"><el-input v-model="logConfig.level_field" placeholder="可选" maxlength="128" /></el-form-item>
+          <el-form-item label="Trace ID 字段"><el-input v-model="logConfig.trace_id_field" placeholder="可选" maxlength="128" /></el-form-item>
+        </template>
         <el-form-item label="标签"><div class="kv-editor"><el-button :icon="Plus" plain :disabled="form.labels.length >= 20" @click="form.labels.push({ key: '', value: '' })">添加标签</el-button><div v-for="(row, index) in form.labels" :key="index" class="kv-row"><el-input v-model="row.key" placeholder="Key" maxlength="64" /><el-input v-model="row.value" placeholder="Value" maxlength="200" /><el-button :icon="Minus" circle aria-label="删除标签" @click="form.labels.splice(index, 1)" /></div></div></el-form-item>
-        <el-collapse class="advanced-config"><el-collapse-item title="高级配置" name="advanced"><el-form-item label="自定义 HTTP 头"><div class="kv-editor"><el-button :icon="Plus" plain :disabled="headers.length >= 20" @click="headers.push({ key: '', value: '' })">添加 HTTP 头</el-button><div v-for="(row, index) in headers" :key="index" class="kv-row"><el-input v-model="row.key" placeholder="Header 名称" maxlength="128" /><el-input v-model="row.value" placeholder="Header 值" maxlength="1000" /><el-button :icon="Minus" circle aria-label="删除 HTTP 头" @click="headers.splice(index, 1)" /></div></div></el-form-item><p class="field-help">用于额外认证或多租户标识，应用于连接测试和指标查询。</p></el-collapse-item></el-collapse>
+        <el-collapse class="advanced-config"><el-collapse-item title="高级配置" name="advanced"><el-form-item label="自定义 HTTP 头"><div class="kv-editor"><el-button :icon="Plus" plain :disabled="headers.length >= 20" @click="headers.push({ key: '', value: '' })">添加 HTTP 头</el-button><div v-for="(row, index) in headers" :key="index" class="kv-row"><el-input v-model="row.key" placeholder="Header 名称" maxlength="128" /><el-input v-model="row.value" placeholder="Header 值" maxlength="1000" /><el-button :icon="Minus" circle aria-label="删除 HTTP 头" @click="headers.splice(index, 1)" /></div></div></el-form-item><p class="field-help">用于额外认证或多租户标识，应用于连接测试和数据查询。</p></el-collapse-item></el-collapse>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" /></el-form-item>
         <el-form-item label="启用状态"><el-switch v-model="form.status" :active-value="1" :inactive-value="0" /></el-form-item>
       </el-form>
@@ -88,6 +110,10 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, ArrowLeft, Connection, Delete, Edit, Minus, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { getDatasourceTypes, getDatasources, createDatasource, updateDatasource, deleteDatasource, batchUpdateDatasourceStatus, batchDeleteDatasources, testConnection, testSavedConnection } from '../../api/datasource'
+import jaegerLogo from '../../assets/jaeger-logo.svg'
+import elasticsearchLogo from '../../assets/elasticsearch-logo.svg'
+import clickhouseLogo from '../../assets/clickhouse-logo.svg'
+import lokiLogo from '../../assets/loki-logo.svg'
 import victoriaMetricsLogo from '../../assets/victoriametrics-logo.svg'
 import prometheusLogo from '../../assets/prometheus-logo.7aa022e5.svg'
 
@@ -97,16 +123,27 @@ const page = ref(1), pageSize = ref(10), total = ref(0), sortBy = ref('id'), sor
 const testVisible = ref(false), testResult = ref(null), headers = ref([])
 const datasourceTypes = ref([])
 const creationStep = ref('type')
-const sourceDescription = item => ({ prometheus: '指标监控', victoriametrics: '时序数据库' }[item.type] || capabilityLabel(item.capabilities))
+const sourceDescription = item => ({ jaeger: 'Trace 链路追踪', loki: '日志查询', elasticsearch: '全文日志检索', clickhouse: '列式分析数据库', prometheus: '指标监控', victoriametrics: '时序数据库' }[item.type] || capabilityLabel(item.capabilities))
 const authOptions = [{ value: 'none', label: '无认证' }, { value: 'basic', label: 'Basic Auth' }, { value: 'bearer', label: 'Bearer Token' }]
+const sourceGroup = item => {
+  if (item.category === 'database') return 'database'
+  if (item.capabilities?.includes('logs')) return 'logs'
+  if (item.capabilities?.includes('traces')) return 'traces'
+  return item.category || 'observability'
+}
+const sourceGroupLabel = value => ({ observability: '监控', logs: '日志', database: '数据库', traces: '链路' }[value] || value)
+const sourceGroupOrder = ['observability', 'logs', 'database', 'traces']
 const groupedTypeOptions = computed(() => {
   const groups = new Map()
   for (const item of datasourceTypes.value) {
-    const value = item.category || 'observability'
-    if (!groups.has(value)) groups.set(value, { value, label: value === 'observability' ? '可观测' : value, items: [] })
+    const value = sourceGroup(item)
+    if (!groups.has(value)) groups.set(value, { value, label: sourceGroupLabel(value), items: [] })
     groups.get(value).items.push(item)
   }
-  return [...groups.values()]
+  return [...groups.values()].sort((a, b) => {
+    const order = value => sourceGroupOrder.includes(value) ? sourceGroupOrder.indexOf(value) : sourceGroupOrder.length
+    return order(a.value) - order(b.value)
+  })
 })
 function handleDrawerBack() {
   if (!form.id && creationStep.value === 'config') creationStep.value = 'type'
@@ -114,8 +151,12 @@ function handleDrawerBack() {
 }
 const typeDefinition = type => datasourceTypes.value.find(item => item.type === type) || {}
 const selectedType = computed(() => typeDefinition(form.type))
-const capabilityLabel = capabilities => (capabilities || []).map(value => ({ metrics: '指标查询与告警规则评估', logs: '日志查询', traces: '链路查询' }[value] || value)).join('、')
+const capabilityLabel = capabilities => (capabilities || []).map(value => ({ metrics: '指标查询与告警规则评估', logs: '日志查询', traces: '链路查询', sql: 'SQL 查询' }[value] || value)).join('、')
 const blankForm = () => ({ id: null, name: '', type: '', category: 'observability', capabilities: 'metrics', url: '', auth_type: 'none', labels: [], config: '', tunnel_id: 0, priority: 100, region: '', env: '', domain: '', remark: '', status: 1 })
+const defaultLogConfig = type => ({ index: type === 'elasticsearch' ? 'logs-*' : '', database: 'default', table: 'otel_logs', timestamp_field: type === 'clickhouse' ? 'Timestamp' : '@timestamp', message_field: type === 'clickhouse' ? 'Body' : 'message', service_field: '', level_field: '', trace_id_field: '' })
+const logConfig = reactive(defaultLogConfig(''))
+const logMappingEnabled = ref(false)
+const hasLogMapping = computed(() => form.type === 'elasticsearch' || (form.type === 'clickhouse' && logMappingEnabled.value))
 const form = reactive(blankForm()), authFields = reactive({ username: '', password: '', token: '' })
 let originalAuth = {}, originalAuthType = 'none', originalConfig = {}, keywordTimer, requestID = 0
 const canReuseAuth = computed(() => Boolean(form.id && form.auth_type === originalAuthType))
@@ -156,6 +197,9 @@ function handleAdd() {
 function selectDatasourceType(item) {
   if (form.type !== item.type) {
     Object.assign(form, blankForm(), { type: item.type })
+    Object.assign(logConfig, defaultLogConfig(item.type))
+    logMappingEnabled.value = false
+    originalConfig = {}
     Object.assign(authFields, { username: '', password: '', token: '' })
     headers.value = []
   }
@@ -166,6 +210,8 @@ function handleEdit(row) {
   creationStep.value = 'config'
   Object.assign(form, blankForm(), row, { labels: objectToRows(parseObject(row.labels)) })
   originalAuth = parseObject(row.auth_config); originalAuthType = row.auth_type || 'none'; originalConfig = parseObject(row.config)
+  Object.assign(logConfig, defaultLogConfig(row.type), originalConfig.log_query || {})
+  logMappingEnabled.value = Boolean(originalConfig.log_query)
   Object.assign(authFields, { username: originalAuth.username || '', password: '', token: '' }); headers.value = objectToRows(originalConfig.custom_headers || {})
   formRef.value?.clearValidate(); drawerVisible.value = true
 }
@@ -191,7 +237,14 @@ async function payload() {
       keys.add(normalized)
     }
   }
-  return { ...form, name: form.name.trim(), type: form.type, url: form.url.trim(), labels: JSON.stringify(rowsToObject(form.labels)), auth_config: buildAuthConfig(), config: JSON.stringify({ ...originalConfig, custom_headers: rowsToObject(headers.value) }) }
+  const config = { ...originalConfig, custom_headers: rowsToObject(headers.value) }
+  if (hasLogMapping.value) {
+    const mapping = Object.fromEntries(Object.entries(logConfig).map(([key, value]) => [key, value.trim()]))
+    const required = ['timestamp_field', 'message_field', ...(form.type === 'elasticsearch' ? ['index'] : ['database', 'table'])]
+    if (required.some(key => !mapping[key])) { ElMessage.warning('请填写日志索引或数据库、表以及时间和正文字段'); return null }
+    config.log_query = mapping
+  } else if (form.type === 'clickhouse') { delete config.log_query }
+  return { ...form, name: form.name.trim(), type: form.type, url: form.url.trim(), labels: JSON.stringify(rowsToObject(form.labels)), auth_config: buildAuthConfig(), config: JSON.stringify(config) }
 }
 async function handleSubmit() {
   const data = await payload(); if (!data) return
@@ -518,6 +571,9 @@ async function handleBatchCommand(command) {
 .picker-footer { display:flex; justify-content:flex-end; }
 @media(max-width:460px) { .type-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(prefers-reduced-motion:reduce) { .step2-wrapper { animation:none; } .type-card { transition:none; } }
+.log-source-logo { object-fit: contain; }
+.jaeger-logo { object-fit: contain; }
+.loki-logo { object-fit: contain; }
 .vm-logo { object-fit:contain; filter:invert(1); }
 html.dark .vm-logo { filter:none; }
 .selected-type-logo { object-fit:contain; }
